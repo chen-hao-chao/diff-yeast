@@ -11,7 +11,7 @@ filename = "/datasets/yeast-imgs/R1/Rep1_Plate9_016024010_cell_3085833.tiff"
 imgs = [tiff.imread(filename)[2,:,:], tiff.imread(filename)[1,:,:], tiff.imread(filename)[0,:,:]]
 
 io.logger_setup()
-model = denoise.CellposeDenoiseModel(gpu=False, model_type="cyto3",restore_type="denoise_cyto3")
+model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
 masks, flows, styles, imgs_dn = model.eval(imgs, channels=[0,0])
 
 z = np.zeros((64,64))

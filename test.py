@@ -1,12 +1,7 @@
-from PIL import Image
-import numpy
+import pandas as pd
+from ast import literal_eval 
 
-im = Image.open('/datasets/yeast-imgs/R1/Rep1_Plate4_008016002_cell_1100167.tiff')
-imarray = numpy.array(im)
-print(imarray.shape)
-print(imarray)
-
-jpeg_image = im.convert("RGB")
-
-# Save the JPEG image
-jpeg_image.save("example.jpg")
+loaded_df = pd.read_csv('/datasets/yeast-imgs/single_cell_annotations/group_by_correctedMaxCycle_num_rep1.csv', index_col='correctedMaxCycle_num')
+filenames = loaded_df['filename'].apply(literal_eval)
+result_dict = filenames[0][:10]
+print(result_dict)

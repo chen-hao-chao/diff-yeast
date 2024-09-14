@@ -100,13 +100,13 @@ def plot_and_save_gray_comp(imgs_dn_2, imgs_dn_1, imgs_dn_0, mask, filename):
 
 total = 100
 bs = 100
-for i in range(6):
+for i in range(2,6):
     loaded_df = pd.read_csv('/datasets/yeast-imgs/single_cell_annotations/group_by_cycle_rep1_filename_dict.csv', index_col='correctedMaxCycle_num')
     filenames = loaded_df['filename'].apply(literal_eval)
     result_dict = filenames[i][:total]
 
     dataset = MyData(root_dir='/datasets/yeast-imgs/R1', data_list=result_dict, phase=i)
-    data_loader = DataLoader(dataset, batch_size=bs, shuffle=True)
+    data_loader = DataLoader(dataset, batch_size=bs, shuffle=False)
     
     # setup models
     io.logger_setup()
@@ -137,7 +137,7 @@ for i in range(6):
 
         print(str(j)+"-th image...")
         shift_list = sorted(determine_center(masks_2[j].squeeze()), key=lambda x: x[1])
-        mask = shift_list[0][0] if (i < 3 or len(shift_list)==1) else (shift_list[0][0] + shift_list[1][0])
+        mask = shift_list[0][0] if (i < 2 or len(shift_list)==1) else (shift_list[0][0] + shift_list[1][0])
         merged_img = merge(imgs_dn_2_, imgs_dn_1_, imgs_dn_0_, mask)
         plot_and_save_rgb(merged_img, mask, 'results/'+str(i+1)+'/'+str(j+1)+'.png')
-        # plot_and_save_gray_comp(imgs_dn_2_, imgs_dn_1_, imgs_dn_0_, mask, 'results/'+str(i+1)+'/'+str(j+1)+'.png')
+        plot_and_save_gray_comp(imgs_dn_2_, imgs_dn_1_, imgs_dn_0_, mask, 'results/'+str(i+1)+'/'+str(j+1)+'_ori.png')

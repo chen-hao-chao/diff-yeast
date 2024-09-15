@@ -1,0 +1,16 @@
+defaults:
+  - _self_
+  - config: base
+  - override hydra/hydra_logging: disabled  
+  - override hydra/job_logging: disabled
+
+hydra:  
+  output_subdir: null  
+  run:  
+    dir: .
+
+gene_name: Hole
+img_idx: 10 
+bs: 10
+exam_bs: 5 
+balance_fac: 0.25

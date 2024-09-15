@@ -1,0 +1,5 @@
+gene_name: TFB2
+img_idx: 1
+bs: 100
+exam_bs: 5 
+balance_fac: 0.25

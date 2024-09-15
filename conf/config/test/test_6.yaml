@@ -1,0 +1,5 @@
+gene_name: IDI1
+img_idx: 1
+bs: 100
+exam_bs: 1
+balance_fac: 0.25

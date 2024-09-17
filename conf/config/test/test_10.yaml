@@ -1,5 +1,5 @@
-gene_name: KAP120
-img_idx: 1
+gene_name: FUN14
+img_idx: 2
 bs: 100
 exam_bs: 5 
 balance_fac: 0.25

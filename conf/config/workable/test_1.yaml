@@ -1,0 +1,5 @@
+gene_name: CCR4 # RLM1, RPS6A, GLR1, MSD1, HOS3, IDI1, MRP51, VPS30, TFB2, KAP120
+img_idx: 1
+bs: 100
+exam_bs: 5
+balance_fac: 0.25

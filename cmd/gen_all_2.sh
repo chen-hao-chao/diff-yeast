@@ -1,0 +1,9 @@
+python naive_video_gen.py config=test/test_9.yaml
+python naive_video_gen.py config=test/test_10.yaml
+python naive_video_gen.py config=test/test_11.yaml
+python naive_video_gen.py config=test/test_12.yaml
+python naive_video_gen.py config=test/test_13.yaml
+python naive_video_gen.py config=test/test_14.yaml
+python naive_video_gen.py config=test/test_15.yaml
+python naive_video_gen.py config=test/test_16.yaml
+python naive_video_gen.py config=test/test_17.yaml

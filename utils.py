@@ -32,16 +32,16 @@ def similarity_compute(img_1: np.array, img_2: np.array):
     score = structural_similarity(img_1.squeeze()/255, img_2.squeeze()/255, data_range=1.0)
     return score
 
-def score_compute(mask_list, img_2_list, img_1_list, img_0_list, balance_fac=0.25):
+def score_compute(mask_list, img_2_list, img_1_list, img_0_list, balance_fac=0.25, weight=[0.4,0.4,0.2]):
     mask, ref_mask = mask_list
     img_2, ref_img_2 = img_2_list
     img_1, ref_img_1 = img_1_list
     img_0, ref_img_0 = img_0_list
 
     iou = iou_compute(ref_mask, mask)
-    ssim_2 = similarity_compute( ref_img_2, img_2 )*0.2
-    ssim_1 = similarity_compute( ref_img_1, img_1 )*0.4
-    ssim_0 = similarity_compute( ref_img_0, img_0 )*0.4
+    ssim_2 = similarity_compute( ref_img_2, img_2 )*weight[2]
+    ssim_1 = similarity_compute( ref_img_1, img_1 )*weight[1]
+    ssim_0 = similarity_compute( ref_img_0, img_0 )*weight[0]
     score = iou + balance_fac*(ssim_2 + ssim_1 + ssim_0)
 
     return score
@@ -90,7 +90,17 @@ def interpolate(gif, model):
         new_gif.append(gif[i])
     return new_gif
 
-def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img_0, filename, duration=200):
+def interpolate_idx(gif, model, idx):
+    new_gif = []
+    new_gif.append(gif[0])
+    for i in range(1,len(gif)):
+        if i in idx:
+            new_frame = gen_frame(gif[i-1], gif[i], model)
+            new_gif.append(new_frame)
+        new_gif.append(gif[i])
+    return new_gif
+
+def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img_0, filename):
     set_show_save_dir('./')
     model = hub.load("https://tfhub.dev/google/film/1")
     _UINT8_MAX_F = float(np.iinfo(np.uint8).max)
@@ -100,14 +110,13 @@ def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img
         merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask[i]).astype(np.float32) / _UINT8_MAX_F
         gif.append(merged_img)
 
-    gif = interpolate(gif, model)
-    gif = interpolate(gif, model)
-        
+    gif = interpolate_idx(gif, model, [2,3,4]) # 6 frames
+    gif = interpolate_idx(gif, model, [3,4,5,6]) # 9 frames
+    gif = interpolate(gif, model) # 17 frames
+    gif = gif[len(gif)//5:]
+    gif = interpolate(gif, model) # 65 frames
+    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))]) # 65 frames
+    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))]) # 65 frames
+    
     media.show_images(gif)
-    media.show_video(gif, fps=10, title=filename, codec='gif')
-    # gif = []
-    # for i in range(6):
-    #     merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask[i])
-    #     mid_frame = model(input)
-    #     gif.append(Image.fromarray(merged_img.astype(np.uint8), mode='RGB'))
-    # gif[0].save(filename, save_all=True, append_images=gif[1:], duration=duration, loop=0)
+    media.show_video(gif, fps=60, title=filename, codec='gif')

@@ -107,31 +107,38 @@ def main(cfg : DictConfig) -> None:
             _, _, _, imgs_dn_0 = model.eval(img_list_0, channels=[0,0])
             
             rank_list = []
-
-            for j in range(len(img_list_2)):
-                print("Segmenting the ", str(j), "-th img...")
-                shift_list = sorted(determine_center(masks_2[j].squeeze()), key=lambda x: x[1])
+            for k in range(len(img_list_2)):
+                print("Segmenting the ", str(k), "-th img...")
+                shift_list = sorted(determine_center(masks_2[k].squeeze()), key=lambda x: x[1])
                 mask = shift_list[0][0] if (i < 2 or len(shift_list)==1) else (shift_list[0][0] + shift_list[1][0])
-                img_2 = (imgs_dn_2[j] * 255 / np.amax(imgs_dn_2[j])).astype(int)
-                img_1 = (imgs_dn_1[j] * 255 / np.amax(imgs_dn_1[j])).astype(int)
-                img_0 = (imgs_dn_0[j] * 255 / np.amax(imgs_dn_0[j])).astype(int)
+                img_2 = (imgs_dn_2[k] * 255 / np.amax(imgs_dn_2[k])).astype(int)
+                img_1 = (imgs_dn_1[k] * 255 / np.amax(imgs_dn_1[k])).astype(int)
+                img_0 = (imgs_dn_0[k] * 255 / np.amax(imgs_dn_0[k])).astype(int)
+                size = np.count_nonzero(mask)
+                weight = [0.4,0.4,0.2]
+                balance_fac = 1.0 if i in [1,5] else 0.25
                 score = score_compute(mask_list=[mask, reference_mask[-1]],
-                                      img_2_list=[img_2, reference_img_2[-1]],
-                                      img_1_list=[img_1, reference_img_1[-1]],
-                                      img_0_list=[img_0, reference_img_0[-1]],
-                                      balance_fac=balance_fac)
-                rank_list.append([score, mask, img_2, img_1, img_0])
-            
-            rank_list_sorted = sorted(rank_list, key=lambda x: x[0], reverse=True)
-            for k in range(1):
-                reference_mask.append(rank_list_sorted[k][1])
-                reference_img_2.append(rank_list_sorted[k][2]) # 1x64x64 np array
-                reference_img_1.append(rank_list_sorted[k][3]) # 1x64x64 np array
-                reference_img_0.append(rank_list_sorted[k][4]) # 1x64x64 np array
+                                        img_2_list=[img_2, reference_img_2[-1]],
+                                        img_1_list=[img_1, reference_img_1[-1]],
+                                        img_0_list=[img_0, reference_img_0[-1]],
+                                        balance_fac=balance_fac, weight=weight)
+                rank_list.append([size, score, mask, img_2, img_1, img_0])
+
+            rank_list = sorted(rank_list, key=lambda x: x[0])
+            splits = 1 #(len(rank_list) // 100) + 1
+            num_each_split = (len(rank_list) // 150) + 1 if i in [1,5] else 1
+            for k in range(splits):
+                rank_list_sorted = sorted(rank_list[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
+                for j in range(num_each_split):
+                    reference_mask.append(rank_list_sorted[j][2])
+                    reference_img_2.append(rank_list_sorted[j][3]) # 1x64x64 np array
+                    reference_img_1.append(rank_list_sorted[j][4]) # 1x64x64 np array
+                    reference_img_0.append(rank_list_sorted[j][5]) # 1x64x64 np array
 
     generate_gif(reference_mask, reference_img_2, 
                 reference_img_1, reference_img_0, 
-                filename="array_"+str(gene_name)+"_"+str(img_idx), duration=100)
+                filename="array_"+str(gene_name)+"_"+str(img_idx))
+    print("Successfully generate: ", "array_"+str(gene_name)+"_"+str(img_idx))
 
 if __name__ == '__main__':
     main()

@@ -1,4 +1,4 @@
-gene_name: SWC3 # RLM1, RPS6A, GLR1, MSD1, HOS3, IDI1, MRP51, VPS30, TFB2, KAP120
+gene_name: Hole # RLM1, RPS6A, GLR1, MSD1, HOS3, IDI1, MRP51, VPS30, TFB2, KAP120
 img_idx: 1
 bs: 100
 exam_bs: 5

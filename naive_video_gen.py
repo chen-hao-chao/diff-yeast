@@ -110,13 +110,13 @@ def main(cfg : DictConfig) -> None:
             for k in range(len(img_list_2)):
                 print("Segmenting the ", str(k), "-th img...")
                 shift_list = sorted(determine_center(masks_2[k].squeeze()), key=lambda x: x[1])
-                mask = shift_list[0][0] if (i < 2 or len(shift_list)==1) else (shift_list[0][0] + shift_list[1][0])
+                mask = shift_list[0][0] if (i < 3 or len(shift_list)==1) else (shift_list[0][0] + shift_list[1][0])
                 img_2 = (imgs_dn_2[k] * 255 / np.amax(imgs_dn_2[k])).astype(int)
                 img_1 = (imgs_dn_1[k] * 255 / np.amax(imgs_dn_1[k])).astype(int)
                 img_0 = (imgs_dn_0[k] * 255 / np.amax(imgs_dn_0[k])).astype(int)
                 size = np.count_nonzero(mask)
                 weight = [0.4,0.4,0.2]
-                balance_fac = 1.0 if i in [1,5] else 0.25
+                balance_fac = 0.25#1.0 if i in [1,5] else 0.25
                 score = score_compute(mask_list=[mask, reference_mask[-1]],
                                         img_2_list=[img_2, reference_img_2[-1]],
                                         img_1_list=[img_1, reference_img_1[-1]],
@@ -126,7 +126,9 @@ def main(cfg : DictConfig) -> None:
 
             rank_list = sorted(rank_list, key=lambda x: x[0])
             splits = 1 #(len(rank_list) // 100) + 1
-            num_each_split = (len(rank_list) // 150) + 1 if i in [1,5] else 1
+            num_each_split = 1 #(len(rank_list) // 90) + 1 if i in [1,5] else 1
+            if i == 5 and i == 4:
+                num_each_split += 1
             for k in range(splits):
                 rank_list_sorted = sorted(rank_list[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
                 for j in range(num_each_split):

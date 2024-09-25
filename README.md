@@ -15,7 +15,7 @@ pip install torchvision
 ```
 
 ### Generate Video Examples
-- Generate GIFs with few structure:
+- Generate GIFs:
 ```
 sh cmd/gen_1.sh
 sh cmd/gen_2.sh

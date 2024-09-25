@@ -36,21 +36,25 @@ def main(cfg : DictConfig) -> None:
     cfg = flatten_cfg(cfg)
     args = argparse.Namespace(**cfg)
 
-    gene_name = args.gene_name
+    ORF = args.ORF
     img_idx = args.img_idx
     bs = args.bs
     exam_bs = args.exam_bs
     balance_fac = args.balance_fac
+    balance_fac_iou = args.balance_fac_iou
+    balance_fac_angle = args.balance_fac_angle
+    split_stage = args.split_stage
 
     loaded_df = pd.read_csv('/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv')
     # for s in range(100):
     #     print(loaded_df['Gene Name'][s])
+    # print(loaded_df)
     # assert False
     df_list = []
     for i in range(6):
         print("Loading the ", str(i), "-th stage...")
         df = loaded_df[loaded_df['correctedMaxCycle_num'] == i]
-        df = df[df['Gene Name'] == gene_name]["filename"].apply(literal_eval)
+        df = df[df['ORF'] == ORF]["filename"].apply(literal_eval)
         df_list.append(df[df.index.values.astype(int)[0]])
 
     reference_mask_2 = []
@@ -117,18 +121,15 @@ def main(cfg : DictConfig) -> None:
             for k in range(len(img_list_2)):
                 print("Segmenting the ", str(k), "-th img...")
                 shift_list = sorted(determine_center(masks_2[k].squeeze()), key=lambda x: x[1])
-                mask_2 = shift_list[0][0] if (i < 2 or len(shift_list)==1) else np.clip(shift_list[0][0] + shift_list[1][0], 0, 1)
+                mask_2 = shift_list[0][0] if (i < split_stage or len(shift_list)==1) else np.clip(shift_list[0][0] + shift_list[1][0], 0, 1)
                 shift_list = sorted(determine_center(masks_1[k].squeeze()), key=lambda x: x[1])
-                mask_1 = shift_list[0][0] if (i < 2 or len(shift_list)==1) else np.clip(shift_list[0][0] + shift_list[1][0], 0, 1)
+                mask_1 = shift_list[0][0] if (i < split_stage or len(shift_list)==1) else np.clip(shift_list[0][0] + shift_list[1][0], 0, 1)
                 
                 img_2 = (imgs_dn_2[k] * 255 / np.amax(imgs_dn_2[k])).astype(int)
                 img_1 = (imgs_dn_1[k] * 255 / np.amax(imgs_dn_1[k])).astype(int)
                 img_0 = (imgs_dn_0[k] * 255 / np.amax(imgs_dn_0[k])).astype(int)
                 size = np.count_nonzero(mask_2)
                 weight = [0.4,0.4,0.2]
-                balance_fac = 0.25
-                balance_fac_angle = 0.0 #if (i >= 2) else 0.0
-                balance_fac_iou = 0.0 #5
                 score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
                                       mask_list_1=[mask_1, reference_mask_1[-1]],
                                       img_2_list=[img_2, reference_img_2[-1]],
@@ -142,7 +143,7 @@ def main(cfg : DictConfig) -> None:
 
             rank_list = sorted(rank_list, key=lambda x: x[0])
             splits = 1
-            num_each_split = 1 #if (i < 4) else 2 #(len(rank_list) // 90) + 1 if i in [1,5] else 1
+            num_each_split = 1
             for k in range(splits):
                 rank_list_sorted = sorted(rank_list[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
                 for j in range(num_each_split):
@@ -154,8 +155,8 @@ def main(cfg : DictConfig) -> None:
 
     generate_gif(reference_mask_2, reference_img_2, 
                 reference_img_1, reference_img_0, 
-                filename="array_"+str(gene_name)+"_"+str(img_idx))
-    print("Successfully generate: ", "array_"+str(gene_name)+"_"+str(img_idx))
+                filename=str(ORF))
+    print("Successfully generate: ", str(ORF))
 
 if __name__ == '__main__':
     main()

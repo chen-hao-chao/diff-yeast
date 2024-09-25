@@ -10,7 +10,11 @@ hydra:
     dir: .
 
 gene_name: Hole
+ORF: Hole
 img_idx: 10 
 bs: 10
 exam_bs: 5 
 balance_fac: 0.25
+balance_fac_iou: 0.0
+balance_fac_angle: 0.0
+split_stage: 2

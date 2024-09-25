@@ -16,7 +16,7 @@ def merge(img_2, img_1, img_0, mask):
     img_2_ = np.vstack([img_2, img_2, img_2])
     img_1_ = np.vstack([img_1, np.zeros(img_1.shape), np.zeros(img_1.shape)])
     img_0_ = np.vstack([np.zeros(img_0.shape), img_0, np.zeros(img_0.shape)])
-    return np.dstack(img_2_*0.0 + img_1_*0.5 + img_0_*0.5).astype(int)
+    return np.dstack(img_2_*0.1 + img_1_*0.5 + img_0_*0.4).astype(int)
 
 def iou_compute(outputs: np.array, labels: np.array):
     # source: https://www.kaggle.com/code/iezepov/fast-iou-scoring-metric-in-pytorch-and-numpy
@@ -148,4 +148,4 @@ def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img
     gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//7*6), len(gif))])
     
     media.show_images(gif)
-    media.show_video(gif, fps=60, title=filename, codec='gif')
+    media.show_video(gif, fps=60, title=filename, codec='gif', border=True)

@@ -1,5 +1,5 @@
 gene_name: KAP120
 img_idx: 1
 bs: 100
-exam_bs: 1
+exam_bs: 5
 balance_fac: 0.25

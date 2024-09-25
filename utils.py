@@ -1,5 +1,7 @@
 import numpy as np
 from skimage.metrics import structural_similarity
+from cellpose import utils
+import cv2
 
 def merge(img_2, img_1, img_0, mask):
     # img_2: (1,64,64) is the base 
@@ -26,23 +28,46 @@ def iou_compute(outputs: np.array, labels: np.array):
     iou = (intersection + SMOOTH) / (union + SMOOTH)
     return iou
 
+def angle_sim_compute(mask_1: np.array, mask_2: np.array):
+    # mask_1: np array (64x64)
+    # mask_2: np array (64x64)
+    try:
+        outlines = utils.outlines_list(mask_1)
+        ellipse = cv2.fitEllipse(np.array(outlines))
+        _, _, angle_1 = ellipse
+
+        outlines = utils.outlines_list(mask_2)
+        ellipse = cv2.fitEllipse(np.array(outlines))
+        _, _, angle_2 = ellipse
+        return - np.abs(angle_1-angle_2) / 360
+    except:
+        print("Cannot compute angle!")
+        return - 1000
+
 def similarity_compute(img_1: np.array, img_2: np.array):
     # img_1: np array (64x64x1)
     # img_2: np array (64x64x1)
     score = structural_similarity(img_1.squeeze()/255, img_2.squeeze()/255, data_range=1.0)
     return score
 
-def score_compute(mask_list, img_2_list, img_1_list, img_0_list, balance_fac=0.25, weight=[0.4,0.4,0.2]):
-    mask, ref_mask = mask_list
+def score_compute(mask_list_2, mask_list_1, img_2_list, img_1_list, img_0_list, balance_fac_iou=0.1, balance_fac_angle=0.3, balance_fac=0.25, weight=[0.4,0.4,0.2]):
+    mask_2, ref_mask_2 = mask_list_2
+    mask_1, ref_mask_1 = mask_list_1
     img_2, ref_img_2 = img_2_list
     img_1, ref_img_1 = img_1_list
     img_0, ref_img_0 = img_0_list
 
-    iou = iou_compute(ref_mask, mask)
+    iou_2 = iou_compute(ref_mask_2, mask_2)
+    iou_1 = iou_compute(ref_mask_1, mask_1)
+    angle_1 = angle_sim_compute(ref_mask_1, mask_1)
+    angle_2 = angle_sim_compute(ref_mask_2, mask_2)
     ssim_2 = similarity_compute( ref_img_2, img_2 )*weight[2]
     ssim_1 = similarity_compute( ref_img_1, img_1 )*weight[1]
     ssim_0 = similarity_compute( ref_img_0, img_0 )*weight[0]
-    score = iou + balance_fac*(ssim_2 + ssim_1 + ssim_0)
+    score = iou_2 + \
+            balance_fac_iou * iou_1 + \
+            balance_fac_angle * angle_1 + \
+            balance_fac * (ssim_2 + ssim_1 + ssim_0)
 
     return score
 
@@ -74,6 +99,10 @@ from typing import Generator, Iterable, List, Optional
 import mediapy as media
 from mediapy import set_show_save_dir
 from PIL import Image
+
+def visualize(data, filename):
+    img = Image.fromarray(np.uint8(data * 255), 'L')
+    img.save(filename)
 
 def gen_frame(frame_1, frame_2, model):
     time = np.array([0.5], dtype=np.float32)
@@ -110,14 +139,13 @@ def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img
         merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask[i]).astype(np.float32) / _UINT8_MAX_F
         gif.append(merged_img)
 
-    gif = interpolate_idx(gif, model, [2,3,4]) # 6 frames
-    gif = interpolate_idx(gif, model, [3,4,5,6]) # 9 frames
-    gif = interpolate(gif, model) # 17 frames
+    gif = interpolate_idx(gif, model, [2,3,4])
+    gif = interpolate_idx(gif, model, [3,4,5,6])
+    gif = interpolate(gif, model)
     gif = gif[len(gif)//5:]
-    gif = interpolate(gif, model) # 65 frames
-    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))]) # 65 frames
-    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//7*6), len(gif))]) # 65 frames
-    # gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//9*8), len(gif))]) # 65 frames
+    gif = interpolate(gif, model)
+    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))])
+    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//7*6), len(gif))])
     
     media.show_images(gif)
     media.show_video(gif, fps=60, title=filename, codec='gif')

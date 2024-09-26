@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 from dataloader import MyData
-from utils import generate_gif, determine_center, visualize
+from utils import generate_gif, determine_center, visualize, add_outline
 from utils import iou_compute, similarity_compute, score_compute, angle_sim_compute
 
 from cellpose import utils, denoise, io
@@ -90,6 +90,10 @@ def main(cfg : DictConfig) -> None:
             shift_list = sorted(determine_center(masks_1[0].squeeze()), key=lambda x: x[1])
             mask_1 = shift_list[0][0]
 
+            # lined = add_outline((imgs_dn_2[0] * 255 / np.amax(imgs_dn_2[0])).astype(int), mask_2)
+            # visualize(lined.squeeze()*mask_2, "test.png")
+            # assert False
+
             reference_mask_2.append(mask_2) # 64x64 np array
             reference_mask_1.append(mask_1) # 64x64 np array
             reference_img_2.append((imgs_dn_2[0] * 255 / np.amax(imgs_dn_2[0])).astype(int)) # 1x64x64 np array
@@ -155,7 +159,7 @@ def main(cfg : DictConfig) -> None:
 
     generate_gif(reference_mask_2, reference_img_2, 
                 reference_img_1, reference_img_0, 
-                filename=str(ORF))
+                filename=str(ORF), slow=True, add_line=True)
     print("Successfully generate: ", str(ORF))
 
 if __name__ == '__main__':

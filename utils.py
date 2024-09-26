@@ -4,14 +4,18 @@ from cellpose import utils
 import cv2
 
 def merge(img_2, img_1, img_0, mask):
-    # img_2: (1,64,64) is the base 
-    # img_1: (1,64,64) takes the R channel
-    # img_0: (1,64,64) takes the G channel
-    # mask: (1,64,64) is a segmentation mask
+    # img_2: (64,64,1) is the base 
+    # img_1: (64,64,1) takes the R channel
+    # img_0: (64,64,1) takes the G channel
+    # mask: (64,64,1) is a segmentation mask
     # ---------
-    img_2 = np.expand_dims(img_2.squeeze()*mask, axis=0)
-    img_1 = np.expand_dims(img_1.squeeze()*mask, axis=0)
-    img_0 = np.expand_dims(img_0.squeeze()*mask, axis=0)
+    img_2 = img_2.squeeze()*mask
+    img_1 = img_1.squeeze()*mask
+    img_0 = img_0.squeeze()*mask
+
+    img_2 = np.expand_dims(img_2, axis=0)
+    img_1 = np.expand_dims(img_1, axis=0)
+    img_0 = np.expand_dims(img_0, axis=0)
 
     img_2_ = np.vstack([img_2, img_2, img_2])
     img_1_ = np.vstack([img_1, np.zeros(img_1.shape), np.zeros(img_1.shape)])
@@ -101,7 +105,7 @@ from mediapy import set_show_save_dir
 from PIL import Image
 
 def visualize(data, filename):
-    img = Image.fromarray(np.uint8(data * 255), 'L')
+    img = Image.fromarray(np.uint8(data), 'L')
     img.save(filename)
 
 def gen_frame(frame_1, frame_2, model):
@@ -129,15 +133,38 @@ def interpolate_idx(gif, model, idx):
         new_gif.append(gif[i])
     return new_gif
 
-def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img_0, filename):
+import scipy.misc
+from skimage.draw import line_aa
+def add_outline(img, mask, channels=3):
+    # img: 64x64x3 or 1
+    # mask: 64x64
+    # return: 64x64x3 or 1
+    outlines = utils.outlines_list(mask)
+    for o in outlines:
+        for i in range(o.shape[0]):
+            next_i = 0 if i+1 == o.shape[0] else i+1
+            rr, cc, val = line_aa(o[i,1], o[i,0], o[next_i,1], o[next_i,0]) # o[:,0]: x points, o[:,1]: y points
+            if channels==3:
+                img[rr, cc, 2] = val * 50
+                img[rr, cc, 1] = val * 50
+                img[rr, cc, 0] = val * 50
+            elif channels==1:
+                img[rr, cc, 0] = val * 50
+            else:
+                img[rr, cc] = val * 50
+    return img
+
+def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img_0, filename, slow=False, add_line=False):
     set_show_save_dir('./')
     model = hub.load("https://tfhub.dev/google/film/1")
     _UINT8_MAX_F = float(np.iinfo(np.uint8).max)
     
     gif = []
     for i in range(6):
-        merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask[i]).astype(np.float32) / _UINT8_MAX_F
-        gif.append(merged_img)
+        merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask[i])
+        if add_line:
+            merged_img = add_outline(merged_img, reference_mask[i])
+        gif.append(merged_img.astype(np.float32) / _UINT8_MAX_F)
 
     gif = interpolate_idx(gif, model, [2,3,4])
     gif = interpolate_idx(gif, model, [3,4,5,6])
@@ -146,6 +173,9 @@ def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img
     gif = interpolate(gif, model)
     gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))])
     gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//7*6), len(gif))])
+    # if slow:
+    #     gif = interpolate(gif, model)
+
     
     media.show_images(gif)
     media.show_video(gif, fps=60, title=filename, codec='gif', border=True)

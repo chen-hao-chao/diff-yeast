@@ -2,7 +2,7 @@ import imageio.v3 as iio
 import cv2
 import os
 
-directory = 'gif_verify'
+directory = 'gif_verify_seg'
 output_directory = 'gif_verify_add_title'
 try:
     os.mkdir(output_directory) 

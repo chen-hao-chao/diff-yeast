@@ -2,8 +2,8 @@ import imageio.v3 as iio
 import cv2
 import os
 
-directory = 'gif_verify_seg'
-output_directory = 'gif_verify_add_title'
+directory = 'gif_verify_sharpened'
+output_directory = 'gif_verify_add_title_sharp'
 try:
     os.mkdir(output_directory) 
 except:
@@ -15,8 +15,8 @@ for filename in os.listdir(directory):
         frames = iio.imread(f)
         # add the text
         for frame in frames:
-            foo = cv2.putText(frame, filename.split(".")[0],
-                (12, 10),
+            foo = cv2.putText(frame, filename.split(".")[0]+"_SS",
+                (6,10), #(12, 10),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 .28,
                 (255, 255, 255)

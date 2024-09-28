@@ -176,6 +176,16 @@ def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img
     # if slow:
     #     gif = interpolate(gif, model)
 
-    
     media.show_images(gif)
     media.show_video(gif, fps=60, title=filename, codec='gif', border=True)
+
+
+def sharpen(img, channel=1, intensity=5, smoothness=0.5):
+    # img: 64x64x3
+    # Create a sharpening kernel
+    kernel = np.array([[0, -smoothness, 0], [-smoothness, intensity, -smoothness], [0, -smoothness, 0]])
+    # Apply the sharpening filter
+    sharpened_image = cv2.filter2D(img[:,:,channel], -1, kernel)
+    img[:,:,channel] = sharpened_image 
+    return img
+    

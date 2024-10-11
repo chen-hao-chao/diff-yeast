@@ -75,14 +75,14 @@ def score_compute(mask_list_2, mask_list_1, img_2_list, img_1_list, img_0_list, 
 
     return score
 
-def determine_center(seg):
+def determine_center(seg, size=64):
     # seg: (numpy) a map with indeces
     max_idx = np.amax(seg)
     shift_list = []
-    mask = np.zeros((64,64))
+    mask = np.zeros((size,size))
     min_shift = 10000
     for i in range(1,int(max_idx)+1):
-        z = np.zeros((64,64))
+        z = np.zeros((size,size))
         z[seg == i] = 1
         
         shift = 0
@@ -93,7 +93,7 @@ def determine_center(seg):
             shift += np.abs(z.shape[k] - first - last)//2
         shift_list.append([z, shift])
     if len(shift_list) == 0:
-        shift_list.append([np.zeros((64,64)), 0])
+        shift_list.append([np.zeros((size,size)), 0])
     return shift_list
 
 import tensorflow as tf
@@ -104,8 +104,8 @@ import mediapy as media
 from mediapy import set_show_save_dir
 from PIL import Image
 
-def visualize(data, filename):
-    img = Image.fromarray(np.uint8(data), 'L')
+def visualize(data, filename, mode='L'):
+    img = Image.fromarray(np.uint8(data), mode)
     img.save(filename)
 
 def gen_frame(frame_1, frame_2, model):

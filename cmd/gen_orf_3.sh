@@ -1,0 +1,10 @@
+python video_gt_gen.py config=orf/test_22.yaml
+python video_gt_gen.py config=orf/test_23.yaml
+python video_gt_gen.py config=orf/test_24.yaml
+python video_gt_gen.py config=orf/test_25.yaml
+python video_gt_gen.py config=orf/test_26.yaml
+python video_gt_gen.py config=orf/test_27.yaml
+python video_gt_gen.py config=orf/test_28.yaml
+python video_gt_gen.py config=orf/test_29.yaml
+python video_gt_gen.py config=orf/test_30.yaml
+python video_gt_gen.py config=orf/test_31.yaml

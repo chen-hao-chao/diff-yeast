@@ -2,6 +2,8 @@ import numpy as np
 from skimage.metrics import structural_similarity
 from cellpose import utils
 import cv2
+import imutils
+from PIL import Image
 
 def merge(img_2, img_1, img_0, mask):
     # img_2: (64,64,1) is the base 
@@ -154,31 +156,49 @@ def add_outline(img, mask, channels=3):
                 img[rr, cc] = val * 50
     return img
 
-def generate_gif(reference_mask, reference_img_2, reference_img_1, reference_img_0, filename, slow=False, add_line=False):
+def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
+                 reference_img_2, reference_img_1, reference_img_0, 
+                 filename, rotate_angle=0, flip_img=False):
     set_show_save_dir('./')
     model = hub.load("https://tfhub.dev/google/film/1")
     _UINT8_MAX_F = float(np.iinfo(np.uint8).max)
     
     gif = []
     for i in range(6):
-        merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask[i])
-        if add_line:
-            merged_img = add_outline(merged_img, reference_mask[i])
+        reference_mask = reference_mask_2[i] + reference_mask_1[i] + reference_mask_0[i]
+        reference_mask[reference_mask != 0] = 1
+        merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask).astype(np.uint8)
+        
+        # if add_line:
+        #     merged_img = add_outline(merged_img, reference_mask[i])
+
+        # post-processing
+        merged_img = rotate(merged_img, angle=rotate_angle)
+        if flip_img:
+            merged_img = flip(merged_img)
         gif.append(merged_img.astype(np.float32) / _UINT8_MAX_F)
 
     gif = interpolate_idx(gif, model, [2,3,4])
     gif = interpolate_idx(gif, model, [3,4,5,6])
     gif = interpolate(gif, model)
-    gif = gif[len(gif)//5:]
-    gif = interpolate(gif, model)
+    gif = gif[len(gif)//4:]
     gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))])
-    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//7*6), len(gif))])
-    # if slow:
-    #     gif = interpolate(gif, model)
+    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))])
+    gif = interpolate(gif, model)
 
-    media.show_images(gif)
-    media.show_video(gif, fps=60, title=filename, codec='gif', border=True)
+    media.show_video(gif, fps=100, title=filename, codec='gif', border=True)
 
+# https://www.geeksforgeeks.org/how-to-rotate-an-image-using-python/
+def rotate(img, angle=180):
+    # img: 64x64x3
+    rotated_image = imutils.rotate(img, angle=angle)
+    return rotated_image
+
+def flip(img):
+    # img: 64x64x3
+    img = Image.fromarray(img)
+    flipped_img = np.asarray(img.transpose(method=Image.FLIP_LEFT_RIGHT))
+    return flipped_img
 
 def sharpen(img, channel=1, intensity=5, smoothness=0.5):
     # img: 64x64x3

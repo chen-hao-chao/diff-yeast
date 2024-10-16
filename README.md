@@ -12,6 +12,7 @@ pip install -r requirements.txt
 pip install "opencv-python-headless<4.3"
 pip install tensorflow
 pip install torchvision
+pip install imutils
 ```
 
 ### Generate Video Examples
@@ -23,5 +24,15 @@ sh cmd/gen_2.sh
 
 - (Testing) Generate a GIF with a specific structure:
 ```
-python naive_video_gen.py config=test/test_1.yaml
+python video_gt_gen.py config=test/test_1.yaml
+```
+
+- ISSUE: cannot use A40 GPUs.
+```
+RuntimeError: Program 'ffmpeg' is not found; perhaps install ffmpeg using 'apt install ffmpeg'.
+```
+
+- Video ground truth generation
+```
+sh cmd/gen_orf_1.sh
 ```

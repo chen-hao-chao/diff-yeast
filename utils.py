@@ -34,17 +34,19 @@ def iou_compute(outputs: np.array, labels: np.array):
     iou = (intersection + SMOOTH) / (union + SMOOTH)
     return iou
 
+def angle_compute(mask):
+    outlines = utils.outlines_list(mask)
+    ellipse = cv2.fitEllipse(np.array(outlines))
+    _, _, angle = ellipse
+    return angle
+
 def angle_sim_compute(mask_1: np.array, mask_2: np.array):
     # mask_1: np array (64x64)
     # mask_2: np array (64x64)
     try:
-        outlines = utils.outlines_list(mask_1)
-        ellipse = cv2.fitEllipse(np.array(outlines))
-        _, _, angle_1 = ellipse
+        angle_1 = angle_compute(mask_1)
+        angle_2 = angle_compute(mask_2)
 
-        outlines = utils.outlines_list(mask_2)
-        ellipse = cv2.fitEllipse(np.array(outlines))
-        _, _, angle_2 = ellipse
         return - np.abs(angle_1-angle_2) / 360
     except:
         print("Cannot compute angle!")
@@ -56,25 +58,21 @@ def similarity_compute(img_1: np.array, img_2: np.array):
     score = structural_similarity(img_1.squeeze()/255, img_2.squeeze()/255, data_range=1.0)
     return score
 
-def score_compute(mask_list_2, mask_list_1, img_2_list, img_1_list, img_0_list, balance_fac_iou=0.1, balance_fac_angle=0.3, balance_fac=0.25, weight=[0.4,0.4,0.2]):
+def score_compute(mask_list_2, mask_list_1, mask_list_0, img_2_list, img_1_list, img_0_list, balance_fac=0.25, weight=[0.4,0.4,0.2], weight_iou=[0.0,0.0,1.0]):
     mask_2, ref_mask_2 = mask_list_2
     mask_1, ref_mask_1 = mask_list_1
+    mask_0, ref_mask_0 = mask_list_0
     img_2, ref_img_2 = img_2_list
     img_1, ref_img_1 = img_1_list
     img_0, ref_img_0 = img_0_list
 
-    iou_2 = iou_compute(ref_mask_2, mask_2)
-    iou_1 = iou_compute(ref_mask_1, mask_1)
-    angle_1 = angle_sim_compute(ref_mask_1, mask_1)
-    angle_2 = angle_sim_compute(ref_mask_2, mask_2)
-    ssim_2 = similarity_compute( ref_img_2, img_2 )*weight[2]
-    ssim_1 = similarity_compute( ref_img_1, img_1 )*weight[1]
-    ssim_0 = similarity_compute( ref_img_0, img_0 )*weight[0]
-    score = iou_2 + \
-            balance_fac_iou * iou_1 + \
-            balance_fac_angle * angle_1 + \
-            balance_fac * (ssim_2 + ssim_1 + ssim_0)
-
+    iou_2 = iou_compute(ref_mask_2, mask_2)*weight_iou[2]
+    iou_1 = iou_compute(ref_mask_1, mask_1)*weight_iou[1]
+    iou_0 = iou_compute(ref_mask_0, mask_0)*weight_iou[0]
+    ssim_2 = similarity_compute( ref_img_2*ref_mask_2, img_2*mask_2 )*weight[2]
+    ssim_1 = similarity_compute( ref_img_1*ref_mask_1, img_1*mask_1 )*weight[1]
+    ssim_0 = similarity_compute( ref_img_0*ref_mask_0, img_0*mask_0 )*weight[0]
+    score = (iou_2 + iou_1 + iou_0) + balance_fac * (ssim_2 + ssim_1 + ssim_0)
     return score
 
 def determine_center(seg, size=64):
@@ -156,6 +154,11 @@ def add_outline(img, mask, channels=3):
                 img[rr, cc] = val * 50
     return img
 
+def aggregate_masks(mask1, mask2, mask3):
+    mask = mask3 + mask2 + mask1
+    mask[mask != 0] = 1
+    return mask
+
 def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                  reference_img_2, reference_img_1, reference_img_0, 
                  filename, rotate_angle=0, flip_img=False):
@@ -165,8 +168,7 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     
     gif = []
     for i in range(6):
-        reference_mask = reference_mask_2[i] + reference_mask_1[i] + reference_mask_0[i]
-        reference_mask[reference_mask != 0] = 1
+        reference_mask = aggregate_masks(reference_mask_2[i], reference_mask_1[i], reference_mask_0[i])
         merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask).astype(np.uint8)
         
         # if add_line:
@@ -187,6 +189,28 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     gif = interpolate(gif, model)
 
     media.show_video(gif, fps=100, title=filename, codec='gif', border=True)
+
+def stack_imgs(img1, img2, img3):
+    # output: 3x64x64
+    img1 = np.expand_dims(img1, axis=0)
+    img2 = np.expand_dims(img2, axis=0)
+    img3 = np.expand_dims(img3, axis=0)
+    img = np.vstack([img1, img2, img3])
+    return img
+
+def rotate_to_normalize(img1, img2, img3, mask1, mask2, mask3):
+    mask = aggregate_masks(mask1, mask2, mask3)
+    angle = -angle_compute(mask) + 90
+    # rotate images and masks
+    rotated_mask1 = rotate(mask1, angle=angle)
+    rotated_mask2 = rotate(mask2, angle=angle)
+    rotated_mask3 = rotate(mask3, angle=angle)
+
+    rotated_img1 = rotate(img1.squeeze(), angle=angle)
+    rotated_img2 = rotate(img2.squeeze(), angle=angle)
+    rotated_img3 = rotate(img3.squeeze(), angle=angle)
+
+    return rotated_img1, rotated_img2, rotated_img3, rotated_mask1, rotated_mask2, rotated_mask3
 
 # https://www.geeksforgeeks.org/how-to-rotate-an-image-using-python/
 def rotate(img, angle=180):

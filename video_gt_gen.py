@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 from dataloader import MyData
-from utils import generate_gif, determine_center, visualize, add_outline
+from utils import generate_gif, determine_center, visualize, add_outline, rotate_to_normalize
 from utils import iou_compute, similarity_compute, score_compute, angle_sim_compute
 
 from cellpose import utils, denoise, io
@@ -65,17 +65,21 @@ def main(cfg : DictConfig) -> None:
     model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
 
     for rand_idx in range(10): #len(df_list[0])
+        # rand number
+        rnd_1 = random.uniform(-1, 1)
+        rnd_2 = 0#random.uniform(-1, 1)
+        rnd_3 = random.uniform(-1, 1)
+        
         img_idx = randrange(len(df_list[0]))
         print("img_idx: ", img_idx)
-        rnd = random.uniform(-1, 1)
-        balance_fac = args.balance_fac + rnd * 0.2
-        balance_fac_iou = args.balance_fac_iou + rnd * 0.05
-        balance_fac_angle = args.balance_fac_angle
+        
+        balance_fac = args.balance_fac + rnd_1 * 0.2
         print("balance_fac: ", balance_fac)
-        print("balance_fac_iou: ", balance_fac_iou)
-        angle = rnd * 180
-        flip = bool(rnd>0)
+        
+        angle = rnd_2 * 180
+        flip = bool(rnd_3>0)
         print("angle: ", angle)
+        print("flip: ", flip)
 
         reference_mask_2 = []
         reference_mask_1 = []
@@ -117,12 +121,18 @@ def main(cfg : DictConfig) -> None:
                 # visualize(lined.squeeze()*mask_2, "test.png")
                 # assert False
 
+                img_2 = (imgs_dn_2[0] * 255 / np.amax(imgs_dn_2[0])).astype(np.uint8)
+                img_1 = (imgs_dn_1[0] * 255 / np.amax(imgs_dn_1[0])).astype(np.uint8)
+                img_0 = (imgs_dn_0[0] * 255 / np.amax(imgs_dn_0[0])).astype(np.uint8)
+                
+                img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
+
                 reference_mask_2.append(mask_2) # 64x64 np array
                 reference_mask_1.append(mask_1) # 64x64 np array
                 reference_mask_0.append(mask_0) # 64x64 np array
-                reference_img_2.append((imgs_dn_2[0] * 255 / np.amax(imgs_dn_2[0])).astype(int)) # 1x64x64 np array
-                reference_img_1.append((imgs_dn_1[0] * 255 / np.amax(imgs_dn_1[0])).astype(int)) # 1x64x64 np array
-                reference_img_0.append((imgs_dn_0[0] * 255 / np.amax(imgs_dn_0[0])).astype(int)) # 1x64x64 np array
+                reference_img_2.append(img_2) # 1x64x64 np array
+                reference_img_1.append(img_1) # 1x64x64 np array
+                reference_img_0.append(img_0) # 1x64x64 np array
                 continue
             else:
                 img_list_2 = []
@@ -155,20 +165,24 @@ def main(cfg : DictConfig) -> None:
                     shift_list = sorted(determine_center(masks_0[k].squeeze()), key=lambda x: x[1])
                     mask_0 = shift_list[0][0] if (i < split_stage or len(shift_list)==1) else np.clip(shift_list[0][0] + shift_list[1][0], 0, 1)
                     
-                    img_2 = (imgs_dn_2[k] * 255 / np.amax(imgs_dn_2[k])).astype(int)
-                    img_1 = (imgs_dn_1[k] * 255 / np.amax(imgs_dn_1[k])).astype(int)
-                    img_0 = (imgs_dn_0[k] * 255 / np.amax(imgs_dn_0[k])).astype(int)
+                    img_2 = (imgs_dn_2[k] * 255 / np.amax(imgs_dn_2[k])).astype(np.uint8)
+                    img_1 = (imgs_dn_1[k] * 255 / np.amax(imgs_dn_1[k])).astype(np.uint8)
+                    img_0 = (imgs_dn_0[k] * 255 / np.amax(imgs_dn_0[k])).astype(np.uint8)
+                
+                    img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
+
                     size = np.count_nonzero(mask_2)
                     weight = [0.4,0.4,0.2]
+                    weight_iou = [0.0,0.0,1.0]
                     score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
-                                        mask_list_1=[mask_1, reference_mask_1[-1]],
-                                        img_2_list=[img_2, reference_img_2[-1]],
-                                        img_1_list=[img_1, reference_img_1[-1]],
-                                        img_0_list=[img_0, reference_img_0[-1]],
-                                        balance_fac=balance_fac,
-                                        balance_fac_iou=balance_fac_iou,
-                                        balance_fac_angle=balance_fac_angle, 
-                                        weight=weight)
+                                          mask_list_1=[mask_1, reference_mask_1[-1]],
+                                          mask_list_0=[mask_0, reference_mask_0[-1]],
+                                          img_2_list=[img_2, reference_img_2[-1]],
+                                          img_1_list=[img_1, reference_img_1[-1]],
+                                          img_0_list=[img_0, reference_img_0[-1]],
+                                          balance_fac=balance_fac,
+                                          weight=weight,
+                                          weight_iou=weight_iou)
                     rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
 
                 rank_list = sorted(rank_list, key=lambda x: x[0])

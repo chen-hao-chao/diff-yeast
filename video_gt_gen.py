@@ -66,9 +66,9 @@ def main(cfg : DictConfig) -> None:
 
     for rand_idx in range(10): #len(df_list[0])
         # rand number
-        rnd_1 = random.uniform(-1, 1)
+        rnd_1 = 0#random.uniform(-1, 1)
         rnd_2 = 0#random.uniform(-1, 1)
-        rnd_3 = random.uniform(-1, 1)
+        rnd_3 = 0#random.uniform(-1, 1)
         
         img_idx = randrange(len(df_list[0]))
         print("img_idx: ", img_idx)

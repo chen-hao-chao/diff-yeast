@@ -13,6 +13,7 @@ pip install "opencv-python-headless<4.3"
 pip install tensorflow
 pip install torchvision
 pip install imutils
+pip install scikit-learn
 ```
 
 ### Generate Video Examples

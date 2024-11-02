@@ -58,7 +58,7 @@ def similarity_compute(img_1: np.array, img_2: np.array):
     score = structural_similarity(img_1.squeeze()/255, img_2.squeeze()/255, data_range=1.0)
     return score
 
-def score_compute(mask_list_2, mask_list_1, mask_list_0, img_2_list, img_1_list, img_0_list, balance_fac=0.25, weight=[0.4,0.4,0.2], weight_iou=[0.0,0.0,1.0]):
+def score_compute(mask_list_2, mask_list_1, mask_list_0, img_2_list, img_1_list, img_0_list, balance_fac=0.25, balance_fac_cat=0.1, weight=[0.4,0.4,0.2], weight_iou=[0.0,0.0,1.0]):
     mask_2, ref_mask_2 = mask_list_2
     mask_1, ref_mask_1 = mask_list_1
     mask_0, ref_mask_0 = mask_list_0
@@ -72,7 +72,12 @@ def score_compute(mask_list_2, mask_list_1, mask_list_0, img_2_list, img_1_list,
     ssim_2 = similarity_compute( ref_img_2*ref_mask_2, img_2*mask_2 )*weight[2]
     ssim_1 = similarity_compute( ref_img_1*ref_mask_1, img_1*mask_1 )*weight[1]
     ssim_0 = similarity_compute( ref_img_0*ref_mask_0, img_0*mask_0 )*weight[0]
-    score = (iou_2 + iou_1 + iou_0) + balance_fac * (ssim_2 + ssim_1 + ssim_0)
+
+    category_ref = find_centres(ref_mask_2, ref_mask_1, ref_mask_0)
+    category = find_centres(mask_2, mask_1, mask_0)
+    category_score = -np.abs(category_ref - category)
+
+    score = (iou_2 + iou_1 + iou_0) + balance_fac * (ssim_2 + ssim_1 + ssim_0) + balance_fac_cat * category_score
     return score
 
 def determine_center(seg, size=64):
@@ -198,9 +203,20 @@ def stack_imgs(img1, img2, img3):
     img = np.vstack([img1, img2, img3])
     return img
 
+def flip_to_normalize(img1, img2, img3, mask1, mask2, mask3):
+    flipped_mask1 = flip(mask1)
+    flipped_mask2 = flip(mask2)
+    flipped_mask3 = flip(mask3)
+
+    flipped_img1 = flip(img1.squeeze())
+    flipped_img2 = flip(img2.squeeze())
+    flipped_img3 = flip(img3.squeeze())
+
+    return flipped_img1, flipped_img2, flipped_img3, flipped_mask1, flipped_mask2, flipped_mask3
+
 def rotate_to_normalize(img1, img2, img3, mask1, mask2, mask3):
     mask = aggregate_masks(mask1, mask2, mask3)
-    angle = -angle_compute(mask) + 90
+    angle = (90-angle_compute(mask)) % 360
     # rotate images and masks
     rotated_mask1 = rotate(mask1, angle=angle)
     rotated_mask2 = rotate(mask2, angle=angle)
@@ -232,4 +248,37 @@ def sharpen(img, channel=1, intensity=5, smoothness=0.5):
     sharpened_image = cv2.filter2D(img[:,:,channel], -1, kernel)
     img[:,:,channel] = sharpened_image 
     return img
-    
+
+# Sophie's code
+def get_mother_daughter(centroids0_x, centroids1_x, cluster_size0, cluster_size1):
+    # (MotherCell: L; DaughterCell: R) -> 1
+    # (MotherCell: R; DaughterCell: L) -> 0
+    if centroids0_x < centroids1_x:
+        if cluster_size0 > cluster_size1:
+            category = 1
+        else:
+            category = 0
+    else:
+        if cluster_size0 > cluster_size1:
+            category = 0
+        else:
+            category = 1
+    return category
+
+from sklearn.cluster import KMeans
+def find_centres(mask1, mask2, mask3, num_clusters=2):
+    mask = aggregate_masks(mask1, mask2, mask3)
+    coords = np.argwhere(mask)
+    # Apply KMeans clustering to identify 'num_clusters' clusters
+    kmeans = KMeans(n_clusters=2, random_state=0, n_init='auto')
+    kmeans.fit(coords)
+
+    # Get the cluster centers and labels
+    centroids = kmeans.cluster_centers_
+    labels = kmeans.labels_
+    cluster_sizes = np.bincount(labels)
+
+    # Convert centroids to integer pixel coordinates
+    centroids_int = [(int(c[1]), int(c[0])) for c in centroids]  # Swap to (x, y) format
+
+    return get_mother_daughter(centroids_int[0][0], centroids_int[1][0], cluster_sizes[0], cluster_sizes[1])

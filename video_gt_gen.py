@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 from dataloader import MyData
-from utils import generate_gif, determine_center, visualize, add_outline, rotate_to_normalize
+from utils import generate_gif, determine_center, visualize, add_outline, rotate_to_normalize, flip_to_normalize, aggregate_masks
 from utils import iou_compute, similarity_compute, score_compute, angle_sim_compute
 
 from cellpose import utils, denoise, io
@@ -66,15 +66,18 @@ def main(cfg : DictConfig) -> None:
 
     for rand_idx in range(10): #len(df_list[0])
         # rand number
-        rnd_1 = 0#random.uniform(-1, 1)
+        rnd_1 = random.uniform(-1, 1)
         rnd_2 = 0#random.uniform(-1, 1)
         rnd_3 = 0#random.uniform(-1, 1)
+        rnd_4 = random.uniform(-1, 1)
         
         img_idx = randrange(len(df_list[0]))
         print("img_idx: ", img_idx)
         
         balance_fac = args.balance_fac + rnd_1 * 0.2
+        balance_fac_cat = args.balance_fac_cat + rnd_4 * 0.2
         print("balance_fac: ", balance_fac)
+        print("balance_fac_cat: ", balance_fac_cat)
         
         angle = rnd_2 * 180
         flip = bool(rnd_3>0)
@@ -171,7 +174,7 @@ def main(cfg : DictConfig) -> None:
                 
                     img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
-                    size = np.count_nonzero(mask_2)
+                    size = np.count_nonzero(aggregate_masks(mask_2, mask_1, mask_0))
                     weight = [0.4,0.4,0.2]
                     weight_iou = [0.0,0.0,1.0]
                     score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
@@ -181,6 +184,22 @@ def main(cfg : DictConfig) -> None:
                                           img_1_list=[img_1, reference_img_1[-1]],
                                           img_0_list=[img_0, reference_img_0[-1]],
                                           balance_fac=balance_fac,
+                                          balance_fac_cat=balance_fac_cat,
+                                          weight=weight,
+                                          weight_iou=weight_iou)
+                    rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
+
+                    img_2, img_1, img_0, mask_2, mask_1, mask_0 = flip_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
+                    weight = [0.4,0.4,0.2]
+                    weight_iou = [0.0,0.0,1.0]
+                    score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
+                                          mask_list_1=[mask_1, reference_mask_1[-1]],
+                                          mask_list_0=[mask_0, reference_mask_0[-1]],
+                                          img_2_list=[img_2, reference_img_2[-1]],
+                                          img_1_list=[img_1, reference_img_1[-1]],
+                                          img_0_list=[img_0, reference_img_0[-1]],
+                                          balance_fac=balance_fac,
+                                          balance_fac_cat=balance_fac_cat,
                                           weight=weight,
                                           weight_iou=weight_iou)
                     rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])

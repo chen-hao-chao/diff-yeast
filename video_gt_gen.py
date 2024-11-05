@@ -16,7 +16,6 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 import random
 
-
 from collections.abc import MutableMapping
 def flatten_cfg(cfg):
     items = []
@@ -67,8 +66,8 @@ def main(cfg : DictConfig) -> None:
     for rand_idx in range(10): #len(df_list[0])
         # rand number
         rnd_1 = random.uniform(-1, 1)
-        rnd_2 = 0#random.uniform(-1, 1)
-        rnd_3 = 0#random.uniform(-1, 1)
+        rnd_2 = random.uniform(-1, 1)
+        rnd_3 = random.uniform(-1, 1)
         rnd_4 = random.uniform(-1, 1)
         
         img_idx = randrange(len(df_list[0]))
@@ -83,6 +82,9 @@ def main(cfg : DictConfig) -> None:
         flip = bool(rnd_3>0)
         print("angle: ", angle)
         print("flip: ", flip)
+
+        rnk = randrange(3)
+        print("rnk: ", rnk)
 
         reference_mask_2 = []
         reference_mask_1 = []
@@ -206,16 +208,14 @@ def main(cfg : DictConfig) -> None:
 
                 rank_list = sorted(rank_list, key=lambda x: x[0])
                 splits = 1
-                num_each_split = 1
                 for k in range(splits):
                     rank_list_sorted = sorted(rank_list[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
-                    for j in range(num_each_split):
-                        reference_mask_2.append(rank_list_sorted[j][2])
-                        reference_mask_1.append(rank_list_sorted[j][3])
-                        reference_mask_0.append(rank_list_sorted[j][4])
-                        reference_img_2.append(rank_list_sorted[j][5]) # 1x64x64 np array
-                        reference_img_1.append(rank_list_sorted[j][6]) # 1x64x64 np array
-                        reference_img_0.append(rank_list_sorted[j][7]) # 1x64x64 np array
+                    reference_mask_2.append(rank_list_sorted[rnk][2])
+                    reference_mask_1.append(rank_list_sorted[rnk][3])
+                    reference_mask_0.append(rank_list_sorted[rnk][4])
+                    reference_img_2.append(rank_list_sorted[rnk][5]) # 1x64x64 np array
+                    reference_img_1.append(rank_list_sorted[rnk][6]) # 1x64x64 np array
+                    reference_img_0.append(rank_list_sorted[rnk][7]) # 1x64x64 np array
 
         generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                     reference_img_2, reference_img_1, reference_img_0, 

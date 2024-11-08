@@ -37,3 +37,9 @@ RuntimeError: Program 'ffmpeg' is not found; perhaps install ffmpeg using 'apt i
 ```
 sh cmd/gen_orf_1.sh
 ```
+
+- Enhancement
+```
+python refine_sharpen.py
+python refine_add_title.py
+```

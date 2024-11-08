@@ -63,12 +63,12 @@ def main(cfg : DictConfig) -> None:
     io.logger_setup()
     model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
 
-    for rand_idx in range(10): #len(df_list[0])
+    for rand_idx in range(3): #len(df_list[0])
         # rand number
-        rnd_1 = random.uniform(-1, 1)
+        rnd_1 = 0 #random.uniform(-1, 1)
         rnd_2 = random.uniform(-1, 1)
         rnd_3 = random.uniform(-1, 1)
-        rnd_4 = random.uniform(-1, 1)
+        rnd_4 = 0 #random.uniform(-1, 1)
         
         img_idx = randrange(len(df_list[0]))
         print("img_idx: ", img_idx)
@@ -83,7 +83,7 @@ def main(cfg : DictConfig) -> None:
         print("angle: ", angle)
         print("flip: ", flip)
 
-        rnk = randrange(3)
+        rnk = randrange(2)
         print("rnk: ", rnk)
 
         reference_mask_2 = []

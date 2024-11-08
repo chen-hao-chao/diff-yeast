@@ -9,8 +9,8 @@ import tensorflow_hub as hub
 model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
 model_inter = hub.load("https://tfhub.dev/google/film/1")
 
-directory = 'gif_verify'
-output_directory = 'gif_verify_sharpened'
+directory = 'test_fig'
+output_directory = 'test_fig_sharpened'
 try:
     os.mkdir(output_directory) 
 except:
@@ -18,15 +18,20 @@ except:
 
 
 for filename in os.listdir(directory):
-    f = os.path.join(directory, filename) # filename
-    if os.path.isfile(f):
-        frames = iio.imread(f)
-        new_gif = []
-        ori_gif = []
-        
-        for i in range(frames.shape[0]):
-            new_frame = sharpen(frames[i], channel=1, intensity=3.5, smoothness=0.5)
-            new_gif.append(new_frame)
-            ori_gif.append(frames[i])
+    try:
+        os.mkdir(os.path.join(output_directory, filename))
+    except:
+        print("directory exists.")
+    for j in range(3):
+        f = os.path.join(directory, filename, str(j)+'.gif') # filename
+        if os.path.isfile(f):
+            frames = iio.imread(f)
+            new_gif = []
+            ori_gif = []
+            
+            for i in range(frames.shape[0]):
+                new_frame = sharpen(frames[i], channel=1, intensity=3.5, smoothness=0.5)
+                new_gif.append(new_frame)
+                ori_gif.append(frames[i])
 
-        iio.imwrite(os.path.join(output_directory, filename), new_gif, loop=0)
+            iio.imwrite(os.path.join(output_directory, filename, str(j)+'.gif'), new_gif, loop=0)

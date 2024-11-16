@@ -42,4 +42,5 @@ sh cmd/gen_orf_1.sh
 ```
 python refine_sharpen.py
 python refine_add_title.py
+python refine_add_tfid.py
 ```

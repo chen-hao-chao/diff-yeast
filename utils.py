@@ -4,6 +4,7 @@ from cellpose import utils
 import cv2
 import imutils
 from PIL import Image
+import os
 
 def merge(img_2, img_1, img_0, mask):
     # img_2: (64,64,1) is the base 
@@ -119,24 +120,36 @@ def gen_frame(frame_1, frame_2, model):
     mid_frame = model(input_)
     return mid_frame['image'][0].numpy()
 
-def interpolate(gif, model):
+def interpolate(gif, tf_id, model):
     new_gif = []
+    shift = [0 for i in range(len(tf_id))]
     new_gif.append(gif[0])
     for i in range(1,len(gif)):
         new_frame = gen_frame(gif[i-1], gif[i], model)
         new_gif.append(new_frame)
+        for k in range(len(tf_id)):
+            if tf_id[k] >= i:
+                shift[k] = shift[k] + 1
         new_gif.append(gif[i])
-    return new_gif
+    for i in range(len(shift)):
+        tf_id[i] = tf_id[i] + shift[i]
+    return new_gif, tf_id
 
-def interpolate_idx(gif, model, idx):
+def interpolate_idx(gif, tf_id, model, idx):
     new_gif = []
+    shift = [0 for i in range(len(tf_id))]
     new_gif.append(gif[0])
     for i in range(1,len(gif)):
         if i in idx:
             new_frame = gen_frame(gif[i-1], gif[i], model)
             new_gif.append(new_frame)
+            for k in range(len(tf_id)):
+                if tf_id[k] >= i:
+                    shift[k] = shift[k] + 1
         new_gif.append(gif[i])
-    return new_gif
+    for i in range(len(shift)):
+        tf_id[i] = tf_id[i] + shift[i]
+    return new_gif, tf_id
 
 import scipy.misc
 from skimage.draw import line_aa
@@ -172,7 +185,8 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     _UINT8_MAX_F = float(np.iinfo(np.uint8).max)
     
     gif = []
-    for i in range(6):
+    tf_id = []
+    for i in range(len(reference_img_2)):
         reference_mask = aggregate_masks(reference_mask_2[i], reference_mask_1[i], reference_mask_0[i])
         merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask).astype(np.uint8)
         
@@ -184,16 +198,32 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
         if flip_img:
             merged_img = flip(merged_img)
         gif.append(merged_img.astype(np.float32) / _UINT8_MAX_F)
+        tf_id.append(i)
 
-    gif = interpolate_idx(gif, model, [2,3,4])
-    gif = interpolate_idx(gif, model, [3,4,5,6])
-    gif = interpolate(gif, model)
+    gif, tf_id = interpolate_idx(gif, tf_id, model, [2,3,4])
+    gif, tf_id = interpolate_idx(gif, tf_id, model, [3,4,5,6])
+    gif, tf_id = interpolate(gif, tf_id, model)
+    for j in range(len(tf_id)):
+        tf_id[j] = tf_id[j] - int(len(gif)//4)
     gif = gif[len(gif)//4:]
-    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))])
-    gif = interpolate_idx(gif, model, [i for i in range(int(len(gif)//5*4), len(gif))])
-    gif = interpolate(gif, model)
+    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//5*4), len(gif))])
+    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//5*4), len(gif))])
+    gif, tf_id = interpolate(gif, tf_id, model)
+    gif, tf_id = interpolate(gif, tf_id, model)
+    print("Length: ", len(gif), len(tf_id))
 
     media.show_video(gif, fps=100, title=filename, codec='gif', border=True)
+    np.savetxt(filename+'.txt', tf_id, fmt='%d')
+    # write_video(gif, filename+'_video.mp4')
+
+# def write_video(gif, filename):
+#     out = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), 5, (64,64))
+#     for i in range(len(gif)):
+#         img = np.copy(gif[i])
+#         img[:,:,0] = gif[i][:,:,2] # 1 <- 2
+#         img[:,:,2] = gif[i][:,:,0]
+#         out.write(img)
+#     out.release()
 
 def stack_imgs(img1, img2, img3):
     # output: 3x64x64
@@ -216,7 +246,7 @@ def flip_to_normalize(img1, img2, img3, mask1, mask2, mask3):
 
 def rotate_to_normalize(img1, img2, img3, mask1, mask2, mask3):
     mask = aggregate_masks(mask1, mask2, mask3)
-    angle = (90-angle_compute(mask)) % 360
+    angle = 90-angle_compute(mask)
     # rotate images and masks
     rotated_mask1 = rotate(mask1, angle=angle)
     rotated_mask2 = rotate(mask2, angle=angle)

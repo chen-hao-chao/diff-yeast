@@ -64,17 +64,16 @@ def main(cfg : DictConfig) -> None:
     model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
 
     for rand_idx in range(3): #len(df_list[0])
-        # rand number
-        rnd_1 = 0 #random.uniform(-1, 1)
-        rnd_2 = random.uniform(-1, 1)
-        rnd_3 = random.uniform(-1, 1)
-        rnd_4 = 0 #random.uniform(-1, 1)
-        
         img_idx = randrange(len(df_list[0]))
         print("img_idx: ", img_idx)
+
+        # rand number
+        rnd_1 = random.uniform(-1, 1)
+        rnd_2 = random.uniform(-1, 1)
+        rnd_3 = random.uniform(-1, 1)
         
         balance_fac = args.balance_fac + rnd_1 * 0.2
-        balance_fac_cat = args.balance_fac_cat + rnd_4 * 0.2
+        balance_fac_cat = 0.25
         print("balance_fac: ", balance_fac)
         print("balance_fac_cat: ", balance_fac_cat)
         
@@ -208,14 +207,16 @@ def main(cfg : DictConfig) -> None:
 
                 rank_list = sorted(rank_list, key=lambda x: x[0])
                 splits = 1
+                num_frames = 2
                 for k in range(splits):
                     rank_list_sorted = sorted(rank_list[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
-                    reference_mask_2.append(rank_list_sorted[rnk][2])
-                    reference_mask_1.append(rank_list_sorted[rnk][3])
-                    reference_mask_0.append(rank_list_sorted[rnk][4])
-                    reference_img_2.append(rank_list_sorted[rnk][5]) # 1x64x64 np array
-                    reference_img_1.append(rank_list_sorted[rnk][6]) # 1x64x64 np array
-                    reference_img_0.append(rank_list_sorted[rnk][7]) # 1x64x64 np array
+                    for n in range(num_frames):
+                        reference_mask_2.append(rank_list_sorted[rnk+n][2])
+                        reference_mask_1.append(rank_list_sorted[rnk+n][3])
+                        reference_mask_0.append(rank_list_sorted[rnk+n][4])
+                        reference_img_2.append(rank_list_sorted[rnk+n][5]) # 1x64x64 np array
+                        reference_img_1.append(rank_list_sorted[rnk+n][6]) # 1x64x64 np array
+                        reference_img_0.append(rank_list_sorted[rnk+n][7]) # 1x64x64 np array
 
         generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                     reference_img_2, reference_img_1, reference_img_0, 

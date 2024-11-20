@@ -35,10 +35,32 @@ def iou_compute(outputs: np.array, labels: np.array):
     iou = (intersection + SMOOTH) / (union + SMOOTH)
     return iou
 
+# def angle_compute(mask):
+#     outlines = utils.outlines_list(mask)
+#     ellipse = cv2.fitEllipse(np.array(outlines))
+#     _, _, angle = ellipse
+#     return angle
+
+from scipy import stats as scistats
+from sklearn import decomposition as skdecomp
 def angle_compute(mask):
-    outlines = utils.outlines_list(mask)
-    ellipse = cv2.fitEllipse(np.array(outlines))
-    _, _, angle = ellipse
+    y, x = np.where(mask)
+    xy = np.hstack([x.reshape(-1, 1), y.reshape(-1, 1)])
+    pca = skdecomp.PCA(n_components=2)
+    pca = pca.fit(xy)
+    eigenvecs = pca.components_
+    # Calculate angle with arctan2
+    angle = 180.0 * np.arctan2(eigenvecs[0][1], eigenvecs[0][0]) / np.pi
+    # Rotate x coordinates
+    x_rot = (x - x.mean()) * np.cos(np.pi * angle / 180) + (y - y.mean()) * np.sin(
+        np.pi * angle / 180
+    )
+    # Check the skewness of the rotated x coordinate
+    xsk = scistats.skew(x_rot)
+    if xsk < 0.0:
+        angle += 180
+    # Map all angles to anti-clockwise
+    angle = angle % 360
     return angle
 
 def angle_sim_compute(mask_1: np.array, mask_2: np.array):
@@ -246,7 +268,8 @@ def flip_to_normalize(img1, img2, img3, mask1, mask2, mask3):
 
 def rotate_to_normalize(img1, img2, img3, mask1, mask2, mask3):
     mask = aggregate_masks(mask1, mask2, mask3)
-    angle = 90-angle_compute(mask)
+    angle = angle_compute(mask)
+
     # rotate images and masks
     rotated_mask1 = rotate(mask1, angle=angle)
     rotated_mask2 = rotate(mask2, angle=angle)
@@ -258,10 +281,12 @@ def rotate_to_normalize(img1, img2, img3, mask1, mask2, mask3):
 
     return rotated_img1, rotated_img2, rotated_img3, rotated_mask1, rotated_mask2, rotated_mask3
 
+from skimage import transform as sktrans
 # https://www.geeksforgeeks.org/how-to-rotate-an-image-using-python/
 def rotate(img, angle=180):
     # img: 64x64x3
-    rotated_image = imutils.rotate(img, angle=angle)
+    # rotated_image = imutils.rotate(img, angle=angle)
+    rotated_image = sktrans.rotate( image=img,angle=angle,resize=False,preserve_range=True)
     return rotated_image
 
 def flip(img):

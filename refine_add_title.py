@@ -4,6 +4,7 @@ import os
 
 directory = 'test_fig_sharpened'
 output_directory = 'test_fig_sharpened_title'
+num_frames = 1
 try:
     os.mkdir(output_directory) 
 except:
@@ -14,7 +15,7 @@ for filename in os.listdir(directory):
         os.mkdir(os.path.join(output_directory, filename))
     except:
         print("directory exists.")
-    for j in range(3):
+    for j in range(num_frames):
         f = os.path.join(directory, filename, str(j)+'.gif')
         if os.path.isfile(f):
             frames = iio.imread(f)

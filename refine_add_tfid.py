@@ -6,6 +6,7 @@ import numpy as np
 directory_tfid = 'test_fig'
 directory = 'test_fig_sharpened_title'
 output_directory = 'test_fig_sharpened_title_tfid'
+num_frames = 1
 try:
     os.mkdir(output_directory) 
 except:
@@ -16,7 +17,7 @@ for filename in os.listdir(directory):
         os.mkdir(os.path.join(output_directory, filename))
     except:
         print("directory exists.")
-    for j in range(3):
+    for j in range(num_frames):
         f = os.path.join(directory, filename, str(j)+'.gif')
         if os.path.isfile(f):
             tfid = np.loadtxt(os.path.join(directory_tfid, filename, str(j)+'.txt'), dtype=int)

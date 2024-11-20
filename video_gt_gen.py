@@ -63,26 +63,26 @@ def main(cfg : DictConfig) -> None:
     io.logger_setup()
     model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
 
-    for rand_idx in range(3): #len(df_list[0])
-        img_idx = randrange(len(df_list[0]))
-        print("img_idx: ", img_idx)
-
+    for rand_idx in range(1): #len(df_list[0])
         # rand number
-        rnd_1 = random.uniform(-1, 1)
-        rnd_2 = random.uniform(-1, 1)
-        rnd_3 = random.uniform(-1, 1)
-        
+        rnd_0 = 0 #randrange(len(df_list[0]))
+        rnd_1 = 0 #random.uniform(-1, 1)
+        rnd_2 = 0 #random.uniform(-1, 1)
+        rnd_3 = 0 #random.uniform(-1, 1)
+        rnd_4 = 0 #randrange(2)
+
+        img_idx = rnd_0
         balance_fac = args.balance_fac + rnd_1 * 0.2
         balance_fac_cat = 0.25
-        print("balance_fac: ", balance_fac)
-        print("balance_fac_cat: ", balance_fac_cat)
-        
         angle = rnd_2 * 180
         flip = bool(rnd_3>0)
+        rnk = rnd_4
+        
+        print("img_idx: ", img_idx)
+        print("balance_fac: ", balance_fac)
+        print("balance_fac_cat: ", balance_fac_cat)
         print("angle: ", angle)
         print("flip: ", flip)
-
-        rnk = randrange(2)
         print("rnk: ", rnk)
 
         reference_mask_2 = []
@@ -206,10 +206,11 @@ def main(cfg : DictConfig) -> None:
                     rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
 
                 rank_list = sorted(rank_list, key=lambda x: x[0])
-                splits = 1
+                splits = 2
                 num_frames = 2
+                rank_list_sorted_size = sorted(rank_list, key=lambda x: x[0])
                 for k in range(splits):
-                    rank_list_sorted = sorted(rank_list[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
+                    rank_list_sorted = sorted(rank_list_sorted_size[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
                     for n in range(num_frames):
                         reference_mask_2.append(rank_list_sorted[rnk+n][2])
                         reference_mask_1.append(rank_list_sorted[rnk+n][3])

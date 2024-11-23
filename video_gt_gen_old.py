@@ -4,7 +4,6 @@ import os
 from dataloader import MyData
 from utils import generate_gif, determine_center, visualize, add_outline, rotate_to_normalize, flip_to_normalize, aggregate_masks
 from utils import iou_compute, similarity_compute, score_compute, angle_sim_compute
-from utils import normalize_intensity, merge, pseudo_segmentation
 
 from cellpose import utils, denoise, io
 import tifffile as tiff
@@ -62,7 +61,7 @@ def main(cfg : DictConfig) -> None:
         df_list.append(df[df.index.values.astype(int)[0]])
 
     io.logger_setup()
-    # model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
+    model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
 
     for rand_idx in range(1): #len(df_list[0])
         # rand number
@@ -96,7 +95,7 @@ def main(cfg : DictConfig) -> None:
         for i in range(6): 
             print("Calculating the ", str(i), "-th stage...")
             all_choices = df_list[i]
-            dataset = MyData(root_dir='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/R1', data_list=all_choices, phase=0)
+            dataset = MyData(root_dir='/datasets/yeast-imgs/R1', data_list=all_choices, phase=0)
             data_loader = DataLoader(dataset, batch_size=bs, shuffle=False)
             if i == 0:
                 imgs_channel_2 = None
@@ -104,26 +103,32 @@ def main(cfg : DictConfig) -> None:
                 imgs_channel_0 = None
                 batch_count = 0
                 for imgs, labels in data_loader:
-                    imgs_channel_2 = imgs[:,2,:,:].numpy()
-                    imgs_channel_1 = imgs[:,1,:,:].numpy()
-                    imgs_channel_0 = imgs[:,0,:,:].numpy()
+                    imgs_channel_2 = imgs[:,2,:,:]
+                    imgs_channel_1 = imgs[:,1,:,:]
+                    imgs_channel_0 = imgs[:,0,:,:]
                     if batch_count == (img_idx // bs):
                         break
                     else:
                         batch_count = batch_count + 1
+                masks_2, _, _, imgs_dn_2 = model.eval([imgs_channel_2[img_idx % bs]], channels=[0,0])
+                masks_1, _, _, imgs_dn_1 = model.eval([imgs_channel_1[img_idx % bs]], channels=[0,0])
+                masks_0, _, _, imgs_dn_0 = model.eval([imgs_channel_0[img_idx % bs]], channels=[0,0])
 
-                masks_2, imgs_dn_2 = pseudo_segmentation([imgs_channel_2[img_idx % bs]])
-                masks_1, imgs_dn_1 = pseudo_segmentation([imgs_channel_1[img_idx % bs]])
-                masks_0, imgs_dn_0 = pseudo_segmentation([imgs_channel_0[img_idx % bs]])
+                shift_list = sorted(determine_center(masks_2[0].squeeze()), key=lambda x: x[1])
+                mask_2 = shift_list[0][0]
+                shift_list = sorted(determine_center(masks_1[0].squeeze()), key=lambda x: x[1])
+                mask_1 = shift_list[0][0]
+                shift_list = sorted(determine_center(masks_0[0].squeeze()), key=lambda x: x[1])
+                mask_0 = shift_list[0][0]
 
-                mask_2 = masks_2[0]
-                mask_1 = masks_1[0]
-                mask_0 = masks_0[0]
+                # lined = add_outline((imgs_dn_2[0] * 255 / np.amax(imgs_dn_2[0])).astype(int), mask_2)
+                # visualize(lined.squeeze()*mask_2, "test.png")
+                # assert False
 
-                img_2 = normalize_intensity(imgs_dn_2[0])
-                img_1 = normalize_intensity(imgs_dn_1[0])
-                img_0 = normalize_intensity(imgs_dn_0[0])
-
+                img_2 = (imgs_dn_2[0] * 255 / np.amax(imgs_dn_2[0])).astype(np.uint8)
+                img_1 = (imgs_dn_1[0] * 255 / np.amax(imgs_dn_1[0])).astype(np.uint8)
+                img_0 = (imgs_dn_0[0] * 255 / np.amax(imgs_dn_0[0])).astype(np.uint8)
+                
                 img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
                 reference_mask_2.append(mask_2) # 64x64 np array
@@ -139,9 +144,9 @@ def main(cfg : DictConfig) -> None:
                 img_list_0 = []
                 idx = 0
                 for imgs, labels in data_loader:
-                    imgs_channel_2 = imgs[:,2,:,:].numpy()
-                    imgs_channel_1 = imgs[:,1,:,:].numpy()
-                    imgs_channel_0 = imgs[:,0,:,:].numpy()
+                    imgs_channel_2 = imgs[:,2,:,:]
+                    imgs_channel_1 = imgs[:,1,:,:]
+                    imgs_channel_0 = imgs[:,0,:,:]
                     for k in range(imgs.shape[0]):
                         img_list_2.append(imgs_channel_2[k,:,:])
                         img_list_1.append(imgs_channel_1[k,:,:])
@@ -149,21 +154,24 @@ def main(cfg : DictConfig) -> None:
                     idx += 1
                     if idx == exam_bs:
                         break
-
-                masks_2, imgs_dn_2 = pseudo_segmentation(img_list_2)
-                masks_1, imgs_dn_1 = pseudo_segmentation(img_list_1)
-                masks_0, imgs_dn_0 = pseudo_segmentation(img_list_0)
+                
+                masks_2, _, _, imgs_dn_2 = model.eval(img_list_2, channels=[0,0])
+                masks_1, _, _, imgs_dn_1 = model.eval(img_list_1, channels=[0,0])
+                masks_0, _, _, imgs_dn_0 = model.eval(img_list_0, channels=[0,0])
 
                 rank_list = []
                 for k in range(len(img_list_2)):
                     print("Segmenting the ", str(k), "-th img...")
-                    mask_2 = masks_2[k]
-                    mask_1 = masks_1[k]
-                    mask_0 = masks_0[k]
-
-                    img_2 = normalize_intensity(imgs_dn_2[k])
-                    img_1 = normalize_intensity(imgs_dn_1[k])
-                    img_0 = normalize_intensity(imgs_dn_0[k])
+                    shift_list = sorted(determine_center(masks_2[k].squeeze()), key=lambda x: x[1])
+                    mask_2 = shift_list[0][0] if (i < split_stage or len(shift_list)==1) else np.clip(shift_list[0][0] + shift_list[1][0], 0, 1)
+                    shift_list = sorted(determine_center(masks_1[k].squeeze()), key=lambda x: x[1])
+                    mask_1 = shift_list[0][0] if (i < split_stage or len(shift_list)==1) else np.clip(shift_list[0][0] + shift_list[1][0], 0, 1)
+                    shift_list = sorted(determine_center(masks_0[k].squeeze()), key=lambda x: x[1])
+                    mask_0 = shift_list[0][0] if (i < split_stage or len(shift_list)==1) else np.clip(shift_list[0][0] + shift_list[1][0], 0, 1)
+                    
+                    img_2 = (imgs_dn_2[k] * 255 / np.amax(imgs_dn_2[k])).astype(np.uint8)
+                    img_1 = (imgs_dn_1[k] * 255 / np.amax(imgs_dn_1[k])).astype(np.uint8)
+                    img_0 = (imgs_dn_0[k] * 255 / np.amax(imgs_dn_0[k])).astype(np.uint8)
                 
                     img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
@@ -198,8 +206,8 @@ def main(cfg : DictConfig) -> None:
                     rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
 
                 rank_list = sorted(rank_list, key=lambda x: x[0])
-                splits = 1
-                num_frames = 1
+                splits = 2
+                num_frames = 2
                 rank_list_sorted_size = sorted(rank_list, key=lambda x: x[0])
                 for k in range(splits):
                     rank_list_sorted = sorted(rank_list_sorted_size[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
@@ -213,12 +221,8 @@ def main(cfg : DictConfig) -> None:
 
         generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                     reference_img_2, reference_img_1, reference_img_0, 
-                    filename=os.path.join(target_path, str(rand_idx)+'_neu_background'),
-                    rotate_angle=angle, flip_img=flip, apply_mask=True, mode='neu_background')
-        generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
-                    reference_img_2, reference_img_1, reference_img_0, 
-                    filename=os.path.join(target_path, str(rand_idx)+'_neu_structure'),
-                    rotate_angle=angle, flip_img=flip, apply_mask=True, mode='default')
+                    filename=os.path.join(target_path, str(rand_idx)),
+                    rotate_angle=angle, flip_img=flip)
         print("Successfully generate: ", os.path.join(target_path, str(rand_idx)))
 
 if __name__ == '__main__':

@@ -6,24 +6,46 @@ import imutils
 from PIL import Image
 import os
 
-def merge(img_2, img_1, img_0, mask):
+def pseudo_segmentation(img_list):
+    masks = []
+    for i in range(len(img_list)):
+        mask = np.zeros(img_list[i].shape)
+        mask[img_list[i] != 0] = 1
+        masks.append(mask)
+    return masks, img_list
+
+def normalize_intensity(img, avg=0.2):
+    # Normalize the intensity to avg.
+    # Set avg=0 to deactivate the avgerage shifting operation.
+    img = img / np.amax(img)
+    if avg != 0:
+        img = np.clip(img + (avg-np.mean(img)), 0, 1)
+    return (img * 255).astype(np.uint8)
+
+def merge(img_2, img_1, img_0, mask, apply_mask=True, mode='default'):
     # img_2: (64,64,1) is the base 
     # img_1: (64,64,1) takes the R channel
     # img_0: (64,64,1) takes the G channel
     # mask: (64,64,1) is a segmentation mask
     # ---------
-    img_2 = img_2.squeeze()*mask
-    img_1 = img_1.squeeze()*mask
-    img_0 = img_0.squeeze()*mask
+    img_2 = img_2.squeeze()*mask if apply_mask else img_2.squeeze()
+    img_1 = img_1.squeeze()*mask if apply_mask else img_1.squeeze()
+    img_0 = img_0.squeeze()*mask if apply_mask else img_0.squeeze()
 
     img_2 = np.expand_dims(img_2, axis=0)
     img_1 = np.expand_dims(img_1, axis=0)
     img_0 = np.expand_dims(img_0, axis=0)
 
-    img_2_ = np.vstack([img_2, img_2, img_2])
-    img_1_ = np.vstack([img_1, np.zeros(img_1.shape), np.zeros(img_1.shape)])
-    img_0_ = np.vstack([np.zeros(img_0.shape), img_0, np.zeros(img_0.shape)])
-    return np.dstack(img_2_*0.1 + img_1_*0.5 + img_0_*0.4).astype(int)
+    if mode == 'default':
+        img_2_ = np.vstack([img_2, img_2, img_2])
+        img_1_ = np.vstack([img_1, np.zeros(img_1.shape), np.zeros(img_1.shape)])
+        img_0_ = np.vstack([np.zeros(img_0.shape), img_0, np.zeros(img_0.shape)])
+        return np.dstack(img_2_*0.1 + img_1_*0.5 + img_0_*0.4).astype(int)
+    else:
+        img_2_ = np.vstack([np.zeros(img_2.shape), np.zeros(img_2.shape), img_2])
+        img_1_ = np.vstack([img_1, np.zeros(img_1.shape), np.zeros(img_1.shape)])
+        img_0_ = np.vstack([np.zeros(img_0.shape), np.zeros(img_0.shape), np.zeros(img_0.shape)])
+        return np.dstack(img_2_*0.5 + img_1_*0.5 + img_0_*0.0).astype(int)
 
 def iou_compute(outputs: np.array, labels: np.array):
     # source: https://www.kaggle.com/code/iezepov/fast-iou-scoring-metric-in-pytorch-and-numpy
@@ -201,7 +223,7 @@ def aggregate_masks(mask1, mask2, mask3):
 
 def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                  reference_img_2, reference_img_1, reference_img_0, 
-                 filename, rotate_angle=0, flip_img=False):
+                 filename, rotate_angle=0, flip_img=False, apply_mask=True, mode='default'):
     set_show_save_dir('./')
     model = hub.load("https://tfhub.dev/google/film/1")
     _UINT8_MAX_F = float(np.iinfo(np.uint8).max)
@@ -210,13 +232,11 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     tf_id = []
     for i in range(len(reference_img_2)):
         reference_mask = aggregate_masks(reference_mask_2[i], reference_mask_1[i], reference_mask_0[i])
-        merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask).astype(np.uint8)
+        merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask, apply_mask=apply_mask, mode=mode).astype(np.uint8)
         
-        # if add_line:
-        #     merged_img = add_outline(merged_img, reference_mask[i])
-
         # post-processing
-        merged_img = rotate(merged_img, angle=rotate_angle)
+        if rotate_angle != 0:
+            merged_img = rotate(merged_img, angle=rotate_angle)
         if flip_img:
             merged_img = flip(merged_img)
         gif.append(merged_img.astype(np.float32) / _UINT8_MAX_F)

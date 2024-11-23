@@ -24,8 +24,9 @@ for filename in os.listdir(directory):
     except:
         print("directory exists.")
     for j in range(num_frames):
-        f = os.path.join(directory, filename, str(j)+'.gif') # filename
-        if os.path.isfile(f):
+        f = os.path.join(directory, filename, str(j)+'_neu_structure.gif') # filename
+        f_b = os.path.join(directory, filename, str(j)+'_neu_background.gif') # filename
+        if os.path.isfile(f) and os.path.isfile(f_b):
             frames = iio.imread(f)
             new_gif = []
             ori_gif = []
@@ -35,11 +36,17 @@ for filename in os.listdir(directory):
                 new_gif.append(new_frame)
                 ori_gif.append(frames[i])
 
-            iio.imwrite(os.path.join(output_directory, filename, str(j)+'.gif'), new_gif, loop=0)
-            # out = cv2.VideoWriter(os.path.join(output_directory, filename, str(j)+'.mp4'), cv2.VideoWriter_fourcc(*'mp4v'), 5, (64,64))
-            # for i in range(len(new_gif)):
-            #     img = np.copy(new_gif[i])
-            #     img[:,:,0] = new_gif[i][:,:,2] # 1 <- 2
-            #     img[:,:,2] = new_gif[i][:,:,0]
-            #     out.write(img)
-            # out.release()
+            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_neu_structure.gif'), new_gif, loop=0)
+
+            # ----
+
+            frames = iio.imread(f_b)
+            new_gif = []
+            ori_gif = []
+            
+            for i in range(frames.shape[0]):
+                new_frame = sharpen(frames[i], channel=2, intensity=3.5, smoothness=0.5)
+                new_gif.append(new_frame)
+                ori_gif.append(frames[i])
+
+            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_neu_background.gif'), new_gif, loop=0)

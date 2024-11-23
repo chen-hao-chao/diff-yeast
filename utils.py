@@ -1,6 +1,6 @@
 import numpy as np
 from skimage.metrics import structural_similarity
-from cellpose import utils
+# from cellpose import utils
 import cv2
 import imutils
 from PIL import Image

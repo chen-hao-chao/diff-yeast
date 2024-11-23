@@ -6,7 +6,6 @@ from utils import generate_gif, determine_center, visualize, add_outline, rotate
 from utils import iou_compute, similarity_compute, score_compute, angle_sim_compute
 from utils import normalize_intensity, merge, pseudo_segmentation
 
-from cellpose import utils, denoise, io
 import tifffile as tiff
 import pandas as pd
 from ast import literal_eval
@@ -40,6 +39,7 @@ def main(cfg : DictConfig) -> None:
     bs = args.bs
     exam_bs = args.exam_bs
     split_stage = args.split_stage
+    avg = 0.0
 
     target_dir = './test_fig' #'/datasets/yeast-imgs/gt_videos/R1'
     target_path = os.path.join(target_dir, ORF)
@@ -60,9 +60,6 @@ def main(cfg : DictConfig) -> None:
         df = loaded_df[loaded_df['correctedMaxCycle_num'] == i]
         df = df[df['ORF'] == ORF]["filename"].apply(literal_eval)
         df_list.append(df[df.index.values.astype(int)[0]])
-
-    io.logger_setup()
-    # model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
 
     for rand_idx in range(1): #len(df_list[0])
         # rand number
@@ -120,9 +117,9 @@ def main(cfg : DictConfig) -> None:
                 mask_1 = masks_1[0]
                 mask_0 = masks_0[0]
 
-                img_2 = normalize_intensity(imgs_dn_2[0])
-                img_1 = normalize_intensity(imgs_dn_1[0])
-                img_0 = normalize_intensity(imgs_dn_0[0])
+                img_2 = normalize_intensity(imgs_dn_2[0], avg=avg)
+                img_1 = normalize_intensity(imgs_dn_1[0], avg=avg)
+                img_0 = normalize_intensity(imgs_dn_0[0], avg=avg)
 
                 img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
@@ -161,9 +158,9 @@ def main(cfg : DictConfig) -> None:
                     mask_1 = masks_1[k]
                     mask_0 = masks_0[k]
 
-                    img_2 = normalize_intensity(imgs_dn_2[k])
-                    img_1 = normalize_intensity(imgs_dn_1[k])
-                    img_0 = normalize_intensity(imgs_dn_0[k])
+                    img_2 = normalize_intensity(imgs_dn_2[k], avg=avg)
+                    img_1 = normalize_intensity(imgs_dn_1[k], avg=avg)
+                    img_0 = normalize_intensity(imgs_dn_0[k], avg=avg)
                 
                     img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
@@ -211,14 +208,16 @@ def main(cfg : DictConfig) -> None:
                         reference_img_1.append(rank_list_sorted[rnk+n][6]) # 1x64x64 np array
                         reference_img_0.append(rank_list_sorted[rnk+n][7]) # 1x64x64 np array
 
-        generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
-                    reference_img_2, reference_img_1, reference_img_0, 
-                    filename=os.path.join(target_path, str(rand_idx)+'_neu_background'),
-                    rotate_angle=angle, flip_img=flip, apply_mask=True, mode='neu_background')
-        generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
-                    reference_img_2, reference_img_1, reference_img_0, 
-                    filename=os.path.join(target_path, str(rand_idx)+'_neu_structure'),
-                    rotate_angle=angle, flip_img=flip, apply_mask=True, mode='default')
+        if avg == 0.2:
+            generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
+                        reference_img_2, reference_img_1, reference_img_0, 
+                        filename=os.path.join(target_path, str(rand_idx)+'_neu_background'),
+                        rotate_angle=angle, flip_img=flip, apply_mask=True, mode='non-default')
+        else:
+            generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
+                        reference_img_2, reference_img_1, reference_img_0, 
+                        filename=os.path.join(target_path, str(rand_idx)+'_neu_structure'),
+                        rotate_angle=angle, flip_img=flip, apply_mask=True, mode='default')
         print("Successfully generate: ", os.path.join(target_path, str(rand_idx)))
 
 if __name__ == '__main__':

@@ -44,6 +44,8 @@ for filename in os.listdir(directory):
 
             # -----
             frames_b = iio.imread(f_b)
+            i = 0
+            true_frames = []
             for frame in frames_b:
                 text = "T" if (i in tfid) else "F"
                 foo = cv2.putText(frame, text,
@@ -56,5 +58,5 @@ for filename in os.listdir(directory):
                     true_frames.append(foo)
                 i = i+1
             
-            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_background.gif'), frames, loop=0)
+            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_background.gif'), frames_b, loop=0)
             iio.imwrite(os.path.join(output_directory, filename, str(j)+'_background_true.gif'), true_frames, loop=0, fps=1)

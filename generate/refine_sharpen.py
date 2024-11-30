@@ -11,7 +11,7 @@ model_inter = hub.load("https://tfhub.dev/google/film/1")
 
 directory = 'test_fig'
 output_directory = 'test_fig_sharpened'
-num_frames = 1
+num_frames = 10
 try:
     os.mkdir(output_directory) 
 except:
@@ -26,7 +26,7 @@ for filename in os.listdir(directory):
     for j in range(num_frames):
         f = os.path.join(directory, filename, str(j)+'_structure.gif') # filename
         f_b = os.path.join(directory, filename, str(j)+'_default.gif') # filename
-        if os.path.isfile(f) and os.path.isfile(f_b):
+        if os.path.isfile(f):
             frames = iio.imread(f)
             new_gif = []
             ori_gif = []
@@ -39,7 +39,7 @@ for filename in os.listdir(directory):
             iio.imwrite(os.path.join(output_directory, filename, str(j)+'_structure.gif'), new_gif, loop=0)
 
             # ----
-
+        if os.path.isfile(f_b):
             frames = iio.imread(f_b)
             new_gif = []
             ori_gif = []

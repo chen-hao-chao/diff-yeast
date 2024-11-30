@@ -6,7 +6,7 @@ from ast import literal_eval
 
 directory = 'test_fig_sharpened'
 output_directory = 'test_fig_sharpened_title'
-num_frames = 1
+num_frames = 10
 try:
     os.mkdir(output_directory) 
 except:
@@ -23,23 +23,22 @@ for filename in os.listdir(directory):
         f = os.path.join(directory, filename, str(j)+'_structure.gif') # filename
         f_b = os.path.join(directory, filename, str(j)+'_default.gif') # filename
 
-        if os.path.isfile(f) and os.path.isfile(f_b):
-            frames = iio.imread(f)
-            # add the text
-            for frame in frames:
-                
-                dfss = dfs[dfs['ORF']==filename.split(".")[0]]['Structure']
-                dfss = '('+dfss[dfss.index.values.astype(int)[0]]+')'
+        # add the text
+        dfss = dfs[dfs['ORF']==filename.split(".")[0]]['Structure']
+        dfss = '('+dfss[dfss.index.values.astype(int)[0]]+')'
 
-                scale = 0.40
-                face = cv2.FONT_HERSHEY_SIMPLEX
-                textsize = cv2.getTextSize(filename.split(".")[0], face, scale, 2)[0]
-                textsize_s = cv2.getTextSize(dfss, face, scale, 2)[0]
+        scale = 0.40
+        face = cv2.FONT_HERSHEY_SIMPLEX
+        textsize = cv2.getTextSize(filename.split(".")[0], face, scale, 2)[0]
+        textsize_s = cv2.getTextSize(dfss, face, scale, 2)[0]
+        textY = 12
+        textY_s = 24
+        
+        if os.path.isfile(f):
+            frames = iio.imread(f)
+            for frame in frames:
                 textX = int((frame.shape[1] - textsize[0]) / 2)
-                textY = 12
                 textX_s = int((frame.shape[1] - textsize_s[0]) / 2)
-                textY_s = 24
-                
 
                 foo = cv2.putText(frame, filename.split(".")[0],
                     (textX, textY),
@@ -56,9 +55,12 @@ for filename in os.listdir(directory):
             iio.imwrite(os.path.join(output_directory, filename, str(j)+'_default.gif'), frames, loop=0)
 
             # ----
-
+        if os.path.isfile(f_b):
             frames_b = iio.imread(f_b)
             for frame in frames_b:
+                textX = int((frame.shape[1] - textsize[0]) / 2)
+                textX_s = int((frame.shape[1] - textsize_s[0]) / 2)
+
                 foo = cv2.putText(frame, filename.split(".")[0],
                     (textX, textY), #(6,10), #(12, 10),
                     face,

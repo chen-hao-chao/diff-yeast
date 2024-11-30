@@ -6,7 +6,7 @@ import numpy as np
 directory_tfid = 'test_fig'
 directory = 'test_fig_sharpened_title'
 output_directory = 'test_fig_sharpened_title_tfid'
-num_frames = 1
+num_frames = 10
 try:
     os.mkdir(output_directory) 
 except:
@@ -20,9 +20,9 @@ for filename in os.listdir(directory):
     for j in range(num_frames):
         f = os.path.join(directory, filename, str(j)+'_default.gif') # filename
         f_b = os.path.join(directory, filename, str(j)+'_background.gif') # filename
+        tfid = np.loadtxt(os.path.join(directory_tfid, filename, str(j)+'_default.txt'), dtype=int)
 
-        if os.path.isfile(f) and os.path.isfile(f_b):
-            tfid = np.loadtxt(os.path.join(directory_tfid, filename, str(j)+'_default.txt'), dtype=int)
+        if os.path.isfile(f):
             frames = iio.imread(f)
             # add the text
             i = 0
@@ -42,7 +42,8 @@ for filename in os.listdir(directory):
             iio.imwrite(os.path.join(output_directory, filename, str(j)+'_default.gif'), frames, loop=0)
             iio.imwrite(os.path.join(output_directory, filename, str(j)+'_default_true.gif'), true_frames, loop=0, fps=1)
 
-            # -----
+        # -----
+        if os.path.isfile(f_b):
             frames_b = iio.imread(f_b)
             i = 0
             true_frames = []

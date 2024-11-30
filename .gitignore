@@ -1,2 +1,4 @@
 results/*
+test_fig*
+generate/test_fig*
 __pycache__/*

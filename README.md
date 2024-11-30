@@ -2,6 +2,6 @@
 
 ### Create Conda Environment
 ```bash=
-conda create --name dy python=3.8
-conda activate dy
+conda create --name diffy python=3.8
+conda activate diffy
 ```

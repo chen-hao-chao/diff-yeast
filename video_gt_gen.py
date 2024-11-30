@@ -39,7 +39,8 @@ def main(cfg : DictConfig) -> None:
     bs = args.bs
     exam_bs = args.exam_bs
     split_stage = args.split_stage
-    # avg = 0.0
+    mode = 'default' #'structure' #'default'
+    avg = 0.125 #0.2 #0.125
 
     target_dir = './test_fig' #'/datasets/yeast-imgs/gt_videos/R1'
     target_path = os.path.join(target_dir, ORF)
@@ -50,10 +51,6 @@ def main(cfg : DictConfig) -> None:
         print("Directory exists.")
 
     loaded_df = pd.read_csv('/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv')
-    # for s in range(100):
-    #     print(loaded_df['Gene Name'][s])
-    # print(loaded_df)
-    # assert False
     df_list = []
     for i in range(6):
         print("Loading the ", str(i), "-th stage...")
@@ -61,165 +58,156 @@ def main(cfg : DictConfig) -> None:
         df = df[df['ORF'] == ORF]["filename"].apply(literal_eval)
         df_list.append(df[df.index.values.astype(int)[0]])
 
-    for avg in [0.2, 0.0]:
-        for rand_idx in range(1): #len(df_list[0])
-            # rand number
-            rnd_0 = 0 #randrange(len(df_list[0]))
-            rnd_1 = 0 #random.uniform(-1, 1)
-            rnd_2 = 0 #random.uniform(-1, 1)
-            rnd_3 = 0 #random.uniform(-1, 1)
-            rnd_4 = 0 #randrange(2)
+    for rand_idx in range(10): #len(df_list[0])
+        # rand number
+        rnd_0 = randrange(len(df_list[0]))
+        rnd_1 = random.uniform(-1, 1)
+        rnd_2 = random.uniform(-1, 1)
+        rnd_3 = random.uniform(-1, 1)
+        rnd_4 = randrange(3)
 
-            img_idx = rnd_0
-            balance_fac = args.balance_fac + rnd_1 * 0.2
-            balance_fac_cat = 0.25
-            angle = rnd_2 * 180
-            flip = bool(rnd_3>0)
-            rnk = rnd_4
-            
-            print("img_idx: ", img_idx)
-            print("balance_fac: ", balance_fac)
-            print("balance_fac_cat: ", balance_fac_cat)
-            print("angle: ", angle)
-            print("flip: ", flip)
-            print("rnk: ", rnk)
+        img_idx = rnd_0
+        balance_fac = args.balance_fac + rnd_1 * 0.2
+        balance_fac_cat = 0.1
+        angle = rnd_2 * 180
+        flip = bool(rnd_3>0)
+        rnk = rnd_4
+        
+        print("img_idx: ", img_idx)
+        print("balance_fac: ", balance_fac)
+        print("balance_fac_cat: ", balance_fac_cat)
+        print("angle: ", angle)
+        print("flip: ", flip)
+        print("rnk: ", rnk)
 
-            reference_mask_2 = []
-            reference_mask_1 = []
-            reference_mask_0 = []
-            reference_img_2 = []
-            reference_img_1 = []
-            reference_img_0 = []
+        reference_mask_2 = []
+        reference_mask_1 = []
+        reference_mask_0 = []
+        reference_img_2 = []
+        reference_img_1 = []
+        reference_img_0 = []
 
-            for i in range(6): 
-                print("Calculating the ", str(i), "-th stage...")
-                all_choices = df_list[i]
-                dataset = MyData(root_dir='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/R1', data_list=all_choices, phase=0)
-                data_loader = DataLoader(dataset, batch_size=bs, shuffle=False)
-                if i == 0:
-                    imgs_channel_2 = None
-                    imgs_channel_1 = None
-                    imgs_channel_0 = None
-                    batch_count = 0
-                    for imgs, labels in data_loader:
-                        imgs_channel_2 = imgs[:,2,:,:].numpy()
-                        imgs_channel_1 = imgs[:,1,:,:].numpy()
-                        imgs_channel_0 = imgs[:,0,:,:].numpy()
-                        if batch_count == (img_idx // bs):
-                            break
-                        else:
-                            batch_count = batch_count + 1
+        for i in range(6): 
+            print("Calculating the ", str(i), "-th stage...")
+            all_choices = df_list[i]
+            dataset = MyData(root_dir='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/R1', data_list=all_choices, phase=0)
+            data_loader = DataLoader(dataset, batch_size=bs, shuffle=False)
+            if i == 0:
+                imgs_channel_2 = None
+                imgs_channel_1 = None
+                imgs_channel_0 = None
+                batch_count = 0
+                for imgs, labels in data_loader:
+                    imgs_channel_2 = imgs[:,2,:,:].numpy()
+                    imgs_channel_1 = imgs[:,1,:,:].numpy()
+                    imgs_channel_0 = imgs[:,0,:,:].numpy()
+                    if batch_count == (img_idx // bs):
+                        break
+                    else:
+                        batch_count = batch_count + 1
 
-                    masks_2, imgs_dn_2 = pseudo_segmentation([imgs_channel_2[img_idx % bs]])
-                    masks_1, imgs_dn_1 = pseudo_segmentation([imgs_channel_1[img_idx % bs]])
-                    masks_0, imgs_dn_0 = pseudo_segmentation([imgs_channel_0[img_idx % bs]])
+                masks_2, imgs_dn_2 = pseudo_segmentation([imgs_channel_2[img_idx % bs]])
+                masks_1, imgs_dn_1 = pseudo_segmentation([imgs_channel_1[img_idx % bs]])
+                masks_0, imgs_dn_0 = pseudo_segmentation([imgs_channel_0[img_idx % bs]])
 
-                    mask_2 = masks_2[0]
-                    mask_1 = masks_1[0]
-                    mask_0 = masks_0[0]
+                mask_2 = masks_2[0]
+                mask_1 = masks_1[0]
+                mask_0 = masks_0[0]
 
-                    img_2 = normalize_intensity(imgs_dn_2[0], avg=avg)
-                    img_1 = normalize_intensity(imgs_dn_1[0], avg=avg)
-                    img_0 = normalize_intensity(imgs_dn_0[0], avg=avg)
+                img_2 = normalize_intensity(imgs_dn_2[0], avg=avg)
+                img_1 = normalize_intensity(imgs_dn_1[0], avg=avg)
+                img_0 = normalize_intensity(imgs_dn_0[0], avg=avg)
 
+                img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
+
+                reference_mask_2.append(mask_2) # 64x64 np array
+                reference_mask_1.append(mask_1) # 64x64 np array
+                reference_mask_0.append(mask_0) # 64x64 np array
+                reference_img_2.append(img_2) # 1x64x64 np array
+                reference_img_1.append(img_1) # 1x64x64 np array
+                reference_img_0.append(img_0) # 1x64x64 np array
+                continue
+            else:
+                img_list_2 = []
+                img_list_1 = []
+                img_list_0 = []
+                idx = 0
+                for imgs, labels in data_loader:
+                    imgs_channel_2 = imgs[:,2,:,:].numpy()
+                    imgs_channel_1 = imgs[:,1,:,:].numpy()
+                    imgs_channel_0 = imgs[:,0,:,:].numpy()
+                    for k in range(imgs.shape[0]):
+                        img_list_2.append(imgs_channel_2[k,:,:])
+                        img_list_1.append(imgs_channel_1[k,:,:])
+                        img_list_0.append(imgs_channel_0[k,:,:])
+                    idx += 1
+                    if idx == exam_bs:
+                        break
+
+                masks_2, imgs_dn_2 = pseudo_segmentation(img_list_2)
+                masks_1, imgs_dn_1 = pseudo_segmentation(img_list_1)
+                masks_0, imgs_dn_0 = pseudo_segmentation(img_list_0)
+
+                rank_list = []
+                for k in range(len(img_list_2)):
+                    print("Segmenting the ", str(k), "-th img...")
+                    mask_2 = masks_2[k]
+                    mask_1 = masks_1[k]
+                    mask_0 = masks_0[k]
+
+                    img_2 = normalize_intensity(imgs_dn_2[k], avg=avg)
+                    img_1 = normalize_intensity(imgs_dn_1[k], avg=avg)
+                    img_0 = normalize_intensity(imgs_dn_0[k], avg=avg)
+                
                     img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
-                    reference_mask_2.append(mask_2) # 64x64 np array
-                    reference_mask_1.append(mask_1) # 64x64 np array
-                    reference_mask_0.append(mask_0) # 64x64 np array
-                    reference_img_2.append(img_2) # 1x64x64 np array
-                    reference_img_1.append(img_1) # 1x64x64 np array
-                    reference_img_0.append(img_0) # 1x64x64 np array
-                    continue
-                else:
-                    img_list_2 = []
-                    img_list_1 = []
-                    img_list_0 = []
-                    idx = 0
-                    for imgs, labels in data_loader:
-                        imgs_channel_2 = imgs[:,2,:,:].numpy()
-                        imgs_channel_1 = imgs[:,1,:,:].numpy()
-                        imgs_channel_0 = imgs[:,0,:,:].numpy()
-                        for k in range(imgs.shape[0]):
-                            img_list_2.append(imgs_channel_2[k,:,:])
-                            img_list_1.append(imgs_channel_1[k,:,:])
-                            img_list_0.append(imgs_channel_0[k,:,:])
-                        idx += 1
-                        if idx == exam_bs:
-                            break
+                    size = np.count_nonzero(aggregate_masks(mask_2, mask_1, mask_0))
+                    weight = [0.45,0.45,0.1] #[0.4,0.4,0.2]
+                    weight_iou = [0.0,1.0,0.0] #[0.0,0.0,1.0]
+                    score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
+                                        mask_list_1=[mask_1, reference_mask_1[-1]],
+                                        mask_list_0=[mask_0, reference_mask_0[-1]],
+                                        img_2_list=[img_2, reference_img_2[-1]],
+                                        img_1_list=[img_1, reference_img_1[-1]],
+                                        img_0_list=[img_0, reference_img_0[-1]],
+                                        balance_fac=balance_fac,
+                                        balance_fac_cat=balance_fac_cat,
+                                        weight=weight,
+                                        weight_iou=weight_iou)
+                    rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
 
-                    masks_2, imgs_dn_2 = pseudo_segmentation(img_list_2)
-                    masks_1, imgs_dn_1 = pseudo_segmentation(img_list_1)
-                    masks_0, imgs_dn_0 = pseudo_segmentation(img_list_0)
+                    img_2, img_1, img_0, mask_2, mask_1, mask_0 = flip_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
+                    score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
+                                        mask_list_1=[mask_1, reference_mask_1[-1]],
+                                        mask_list_0=[mask_0, reference_mask_0[-1]],
+                                        img_2_list=[img_2, reference_img_2[-1]],
+                                        img_1_list=[img_1, reference_img_1[-1]],
+                                        img_0_list=[img_0, reference_img_0[-1]],
+                                        balance_fac=balance_fac,
+                                        balance_fac_cat=balance_fac_cat,
+                                        weight=weight,
+                                        weight_iou=weight_iou)
+                    rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
 
-                    rank_list = []
-                    for k in range(len(img_list_2)):
-                        print("Segmenting the ", str(k), "-th img...")
-                        mask_2 = masks_2[k]
-                        mask_1 = masks_1[k]
-                        mask_0 = masks_0[k]
+                rank_list = sorted(rank_list, key=lambda x: x[0])
+                splits = 1
+                num_frames = 1
+                rank_list_sorted_size = sorted(rank_list, key=lambda x: x[0])
+                for k in range(splits):
+                    rank_list_sorted = sorted(rank_list_sorted_size[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
+                    for n in range(num_frames):
+                        reference_mask_2.append(rank_list_sorted[rnk+n][2])
+                        reference_mask_1.append(rank_list_sorted[rnk+n][3])
+                        reference_mask_0.append(rank_list_sorted[rnk+n][4])
+                        reference_img_2.append(rank_list_sorted[rnk+n][5]) # 1x64x64 np array
+                        reference_img_1.append(rank_list_sorted[rnk+n][6]) # 1x64x64 np array
+                        reference_img_0.append(rank_list_sorted[rnk+n][7]) # 1x64x64 np array
 
-                        img_2 = normalize_intensity(imgs_dn_2[k], avg=avg)
-                        img_1 = normalize_intensity(imgs_dn_1[k], avg=avg)
-                        img_0 = normalize_intensity(imgs_dn_0[k], avg=avg)
-                    
-                        img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
-
-                        size = np.count_nonzero(aggregate_masks(mask_2, mask_1, mask_0))
-                        weight = [0.4,0.4,0.2]
-                        weight_iou = [0.0,0.0,1.0]
-                        score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
-                                            mask_list_1=[mask_1, reference_mask_1[-1]],
-                                            mask_list_0=[mask_0, reference_mask_0[-1]],
-                                            img_2_list=[img_2, reference_img_2[-1]],
-                                            img_1_list=[img_1, reference_img_1[-1]],
-                                            img_0_list=[img_0, reference_img_0[-1]],
-                                            balance_fac=balance_fac,
-                                            balance_fac_cat=balance_fac_cat,
-                                            weight=weight,
-                                            weight_iou=weight_iou)
-                        rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
-
-                        img_2, img_1, img_0, mask_2, mask_1, mask_0 = flip_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
-                        weight = [0.4,0.4,0.2]
-                        weight_iou = [0.0,0.0,1.0]
-                        score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
-                                            mask_list_1=[mask_1, reference_mask_1[-1]],
-                                            mask_list_0=[mask_0, reference_mask_0[-1]],
-                                            img_2_list=[img_2, reference_img_2[-1]],
-                                            img_1_list=[img_1, reference_img_1[-1]],
-                                            img_0_list=[img_0, reference_img_0[-1]],
-                                            balance_fac=balance_fac,
-                                            balance_fac_cat=balance_fac_cat,
-                                            weight=weight,
-                                            weight_iou=weight_iou)
-                        rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
-
-                    rank_list = sorted(rank_list, key=lambda x: x[0])
-                    splits = 1
-                    num_frames = 2
-                    rank_list_sorted_size = sorted(rank_list, key=lambda x: x[0])
-                    for k in range(splits):
-                        rank_list_sorted = sorted(rank_list_sorted_size[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
-                        for n in range(num_frames):
-                            reference_mask_2.append(rank_list_sorted[rnk+n][2])
-                            reference_mask_1.append(rank_list_sorted[rnk+n][3])
-                            reference_mask_0.append(rank_list_sorted[rnk+n][4])
-                            reference_img_2.append(rank_list_sorted[rnk+n][5]) # 1x64x64 np array
-                            reference_img_1.append(rank_list_sorted[rnk+n][6]) # 1x64x64 np array
-                            reference_img_0.append(rank_list_sorted[rnk+n][7]) # 1x64x64 np array
-
-            if avg == 0.2:
-                generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
-                            reference_img_2, reference_img_1, reference_img_0, 
-                            filename=os.path.join(target_path, str(rand_idx)+'_neu_background'),
-                            rotate_angle=angle, flip_img=flip, apply_mask=True, mode='non-default')
-            else:
-                generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
-                            reference_img_2, reference_img_1, reference_img_0, 
-                            filename=os.path.join(target_path, str(rand_idx)+'_neu_structure'),
-                            rotate_angle=angle, flip_img=flip, apply_mask=True, mode='default')
-            print("Successfully generate: ", os.path.join(target_path, str(rand_idx)))
+        generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
+                    reference_img_2, reference_img_1, reference_img_0, 
+                    filename=os.path.join(target_path, str(rand_idx)+'_'+mode),
+                    rotate_angle=angle, flip_img=flip, apply_mask=True, mode=mode)
+        print("Successfully generate: ", os.path.join(target_path, str(rand_idx)))
 
 if __name__ == '__main__':
     main()

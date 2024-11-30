@@ -24,8 +24,8 @@ for filename in os.listdir(directory):
     except:
         print("directory exists.")
     for j in range(num_frames):
-        f = os.path.join(directory, filename, str(j)+'_neu_structure.gif') # filename
-        f_b = os.path.join(directory, filename, str(j)+'_neu_background.gif') # filename
+        f = os.path.join(directory, filename, str(j)+'_structure.gif') # filename
+        f_b = os.path.join(directory, filename, str(j)+'_default.gif') # filename
         if os.path.isfile(f) and os.path.isfile(f_b):
             frames = iio.imread(f)
             new_gif = []
@@ -36,7 +36,7 @@ for filename in os.listdir(directory):
                 new_gif.append(new_frame)
                 ori_gif.append(frames[i])
 
-            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_neu_structure.gif'), new_gif, loop=0)
+            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_structure.gif'), new_gif, loop=0)
 
             # ----
 
@@ -49,4 +49,4 @@ for filename in os.listdir(directory):
                 new_gif.append(new_frame)
                 ori_gif.append(frames[i])
 
-            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_neu_background.gif'), new_gif, loop=0)
+            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_default.gif'), new_gif, loop=0)

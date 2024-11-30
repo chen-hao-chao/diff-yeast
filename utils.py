@@ -57,12 +57,6 @@ def iou_compute(outputs: np.array, labels: np.array):
     iou = (intersection + SMOOTH) / (union + SMOOTH)
     return iou
 
-# def angle_compute(mask):
-#     outlines = utils.outlines_list(mask)
-#     ellipse = cv2.fitEllipse(np.array(outlines))
-#     _, _, angle = ellipse
-#     return angle
-
 from scipy import stats as scistats
 from sklearn import decomposition as skdecomp
 def angle_compute(mask):
@@ -235,21 +229,22 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
         merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask, apply_mask=apply_mask, mode=mode).astype(np.uint8)
         
         # post-processing
-        if rotate_angle != 0:
-            merged_img = rotate(merged_img, angle=rotate_angle)
         if flip_img:
             merged_img = flip(merged_img)
+        if rotate_angle != 0:
+            merged_img = rotate(merged_img, angle=rotate_angle)
+        
         gif.append(merged_img.astype(np.float32) / _UINT8_MAX_F)
         tf_id.append(i)
 
-    gif, tf_id = interpolate_idx(gif, tf_id, model, [2,3,4])
-    gif, tf_id = interpolate_idx(gif, tf_id, model, [3,4,5,6])
+    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(0,int(len(gif)//6*2))])
     gif, tf_id = interpolate(gif, tf_id, model)
-    for j in range(len(tf_id)):
-        tf_id[j] = tf_id[j] - int(len(gif)//4)
-    gif = gif[len(gif)//4:]
-    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//5*4), len(gif))])
-    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//5*4), len(gif))])
+    gif, tf_id = interpolate(gif, tf_id, model)
+    # for j in range(len(tf_id)):
+    #     tf_id[j] = tf_id[j] - int(len(gif)//4)
+    # gif = gif[len(gif)//4:]
+    # gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
+    gif, tf_id = interpolate(gif, tf_id, model)
     gif, tf_id = interpolate(gif, tf_id, model)
     gif, tf_id = interpolate(gif, tf_id, model)
     print("Length: ", len(gif), len(tf_id))

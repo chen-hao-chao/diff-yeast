@@ -18,11 +18,11 @@ for filename in os.listdir(directory):
     except:
         print("directory exists.")
     for j in range(num_frames):
-        f = os.path.join(directory, filename, str(j)+'_structure.gif') # filename
+        f = os.path.join(directory, filename, str(j)+'_default.gif') # filename
         f_b = os.path.join(directory, filename, str(j)+'_background.gif') # filename
 
         if os.path.isfile(f) and os.path.isfile(f_b):
-            tfid = np.loadtxt(os.path.join(directory_tfid, filename, str(j)+'_neu_structure.txt'), dtype=int)
+            tfid = np.loadtxt(os.path.join(directory_tfid, filename, str(j)+'_default.txt'), dtype=int)
             frames = iio.imread(f)
             # add the text
             i = 0
@@ -39,8 +39,8 @@ for filename in os.listdir(directory):
                     true_frames.append(foo)
                 i = i+1
             kargs = { 'duration': 0.1 }
-            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_structure.gif'), frames, loop=0)
-            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_structure_true.gif'), true_frames, loop=0, fps=1)
+            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_default.gif'), frames, loop=0)
+            iio.imwrite(os.path.join(output_directory, filename, str(j)+'_default_true.gif'), true_frames, loop=0, fps=1)
 
             # -----
             frames_b = iio.imread(f_b)

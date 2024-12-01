@@ -573,6 +573,12 @@ class GaussianDiffusion(nn.Module):
         self.num_frames = num_frames
         self.denoise_fn = denoise_fn
 
+        if isinstance(self.denoise_fn, torch.nn.DataParallel):
+            self.denoise_fn_attr_accessor = denoise_fn.module
+            print("Using torch.nn.DataParallel!")
+        else:
+            self.denoise_fn_attr_accessor = denoise_fn
+
         betas = cosine_beta_schedule(timesteps)
 
         alphas = 1. - betas
@@ -644,7 +650,7 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def p_mean_variance(self, x, t, clip_denoised: bool, cond = None, cond_scale = 1.):
-        x_recon = self.predict_start_from_noise(x, t=t, noise = self.denoise_fn.forward_with_cond_scale(x, t, cond = cond, cond_scale = cond_scale))
+        x_recon = self.predict_start_from_noise(x, t=t, noise = self.denoise_fn_attr_accessor.forward_with_cond_scale(x, t, cond = cond, cond_scale = cond_scale))
 
         if clip_denoised:
             s = 1.
@@ -687,7 +693,7 @@ class GaussianDiffusion(nn.Module):
 
     @torch.inference_mode()
     def sample(self, cond = None, cond_scale = 1., batch_size = 16):
-        device = next(self.denoise_fn.parameters()).device
+        device = next(self.denoise_fn_attr_accessor.parameters()).device
 
         if is_list_str(cond):
             cond = bert_embed(tokenize(cond)).to(device)
@@ -795,16 +801,18 @@ def normalize_img(t):
 def unnormalize_img(t):
     return (t + 1) * 0.5
 
-def cast_num_frames(t, *, frames):
+def cast_num_frames(t, *, frames, split):
     f = t.shape[1]
+    all_frames = t[:, ::split]
+    return all_frames[:, :frames]
 
-    if f == frames:
-        return t
+    # if f == frames:
+    #     return t
 
-    if f > frames:
-        return t[:, :frames]
+    # if f > frames:
+    #     return t[:, :frames]
 
-    return F.pad(t, (0, 0, 0, 0, 0, frames - f))
+    # return F.pad(t, (0, 0, 0, 0, 0, frames - f))
 
 class Dataset(data.Dataset):
     def __init__(
@@ -813,6 +821,7 @@ class Dataset(data.Dataset):
         image_size,
         channels = 3,
         num_frames = 16,
+        split = 1,
         horizontal_flip = False,
         force_num_frames = True,
         exts = ['gif']
@@ -823,10 +832,10 @@ class Dataset(data.Dataset):
         self.channels = channels
         self.paths = [p for ext in exts for p in Path(f'{folder}').glob(f'**/*.{ext}')]
 
-        self.cast_num_frames_fn = partial(cast_num_frames, frames = num_frames) if force_num_frames else identity
+        self.cast_num_frames_fn = partial(cast_num_frames, frames = num_frames, split=split) if force_num_frames else identity
 
         self.transform = T.Compose([
-            T.Resize(image_size),
+            # T.Resize(image_size),
             T.RandomHorizontalFlip() if horizontal_flip else T.Lambda(identity),
             T.CenterCrop(image_size),
             T.ToTensor()
@@ -860,7 +869,8 @@ class Trainer(object):
         save_and_sample_every = 1000,
         results_folder = './results',
         num_sample_rows = 4,
-        max_grad_norm = None
+        max_grad_norm = None,
+        split = 1
     ):
         super().__init__()
         self.model = diffusion_model
@@ -880,7 +890,7 @@ class Trainer(object):
         channels = diffusion_model.channels
         num_frames = diffusion_model.num_frames
 
-        self.ds = Dataset(folder, image_size, channels = channels, num_frames = num_frames)
+        self.ds = Dataset(folder, image_size, channels = channels, num_frames = num_frames, split = split)
 
         print(f'found {len(self.ds)} videos as gif files at {folder}')
         assert len(self.ds) > 0, 'need to have at least 1 video to start training (although 1 is not great, try 100k)'
@@ -896,7 +906,10 @@ class Trainer(object):
 
         self.num_sample_rows = num_sample_rows
         self.results_folder = Path(results_folder)
-        self.results_folder.mkdir(exist_ok = True, parents = True)
+        if self.results_folder.exists():
+            self.load(-1)
+        else:
+            self.results_folder.mkdir(exist_ok = True, parents = True)
 
         self.reset_parameters()
 
@@ -925,6 +938,7 @@ class Trainer(object):
             milestone = max(all_milestones)
 
         data = torch.load(str(self.results_folder / f'model-{milestone}.pt'))
+        print("Load ", str(self.results_folder / f'model-{milestone}.pt'))
 
         self.step = data['step']
         self.model.load_state_dict(data['model'], **kwargs)
@@ -986,4 +1000,40 @@ class Trainer(object):
             log_fn(log)
             self.step += 1
 
+        print('training completed')
+
+class Evaluator(object):
+    def __init__(
+        self,
+        diffusion_model,
+        ema_decay = 0.995,
+        num_sample_rows = 4,
+    ):
+        super().__init__()
+        self.model = diffusion_model
+        self.ema = EMA(ema_decay)
+        self.ema_model = copy.deepcopy(self.model)
+        self.image_size = diffusion_model.image_size
+        self.step = 0
+        self.num_sample_rows = num_sample_rows
+
+    def load(self, file_name, **kwargs):
+        data = torch.load(file_name)
+        self.step = data['step']
+        self.model.load_state_dict(data['model'], **kwargs)
+        self.ema_model.load_state_dict(data['ema'], **kwargs)
+        self.scaler.load_state_dict(data['scaler'])
+
+    def eval(self):
+        num_samples = self.num_sample_rows ** 2
+        batches = num_to_groups(num_samples, self.batch_size)
+
+        all_videos_list = list(map(lambda n: self.ema_model.sample(batch_size=n), batches))
+        all_videos_list = torch.cat(all_videos_list, dim = 0)
+
+        all_videos_list = F.pad(all_videos_list, (2, 2, 2, 2))
+
+        one_gif = rearrange(all_videos_list, '(i j) c f h w -> c f (i h) (j w)', i = self.num_sample_rows)
+        video_path = str(self.results_folder / str(f'eval.gif'))
+        video_tensor_to_gif(one_gif, video_path)
         print('training completed')

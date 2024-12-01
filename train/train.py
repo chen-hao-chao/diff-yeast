@@ -1,32 +1,39 @@
 import torch
 from utils import Unet3D, GaussianDiffusion, Trainer
 
+num_frames = 192
+split = 8
+image_size = 80
+
 model = Unet3D(
-    dim = 64,
+    dim = image_size,
     dim_mults = (1, 2, 4, 8)
 )
 
+model = torch.nn.DataParallel(model)
+
 diffusion = GaussianDiffusion(
-    model.to('cuda'),
-    image_size = 32,
-    num_frames = 5,
+    model,
+    image_size = image_size,
+    num_frames = num_frames // split,
     timesteps = 1000,   # number of steps
     loss_type = 'l1'    # L1 or L2
 )
 
+diffusion = diffusion.to('cuda')
+
 trainer = Trainer(
-    diffusion.to('cuda'),
-    '../results',                         # this folder path needs to contain all your training data, as .gif files, of correct image size and number of frames
+    diffusion,
+    '../gt_videos',                         # this folder path needs to contain all your training data, as .gif files, of correct image size and number of frames
     train_batch_size = 32,
     train_lr = 1e-4,
     save_and_sample_every = 1000,
     train_num_steps = 700000,         # total training steps
     gradient_accumulate_every = 2,    # gradient accumulation steps
     ema_decay = 0.995,                # exponential moving average decay
-    amp = True                        # turn on mixed precision
+    amp = True,                       # turn on mixed precision
+    split = split,
+    results_folder = './results_test'
 )
 
 trainer.train()
-
-sampled_videos = diffusion.sample(batch_size = 10)
-sampled_videos.shape # (4, 3, 5, 32, 32)

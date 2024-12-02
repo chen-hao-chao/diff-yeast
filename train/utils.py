@@ -28,6 +28,11 @@ def exists(x):
 def noop(*args, **kwargs):
     pass
 
+def tblog(dict_, step, writer):
+    wandb.log(dict_)
+    for key, value in zip(dict_.keys(), dict_.values()):
+        writer.add_scalar(str(key), value, step)
+
 def is_odd(n):
     return (n % 2) == 1
 
@@ -850,7 +855,8 @@ class Dataset(data.Dataset):
         return self.cast_num_frames_fn(tensor)
 
 # trainer class
-
+from torch.utils import tensorboard
+import wandb
 class Trainer(object):
     def __init__(
         self,
@@ -910,6 +916,13 @@ class Trainer(object):
             self.load(-1)
         else:
             self.results_folder.mkdir(exist_ok = True, parents = True)
+            Path(str(self.results_folder / 'weights')).mkdir(exist_ok = True, parents = True)
+            Path(str(self.results_folder / 'imgs')).mkdir(exist_ok = True, parents = True)
+            Path(str(self.results_folder / 'tb')).mkdir(exist_ok = True, parents = True)
+            self.writer = tensorboard.SummaryWriter(str(self.results_folder / 'tb'))
+            run = wandb.init(
+                project=str(self.results_folder),
+            )
 
         self.reset_parameters()
 
@@ -929,7 +942,7 @@ class Trainer(object):
             'ema': self.ema_model.state_dict(),
             'scaler': self.scaler.state_dict()
         }
-        torch.save(data, str(self.results_folder / f'model-{milestone}.pt'))
+        torch.save(data, str(self.results_folder / 'weights' / f'model-{milestone}.pt'))
 
     def load(self, milestone, **kwargs):
         if milestone == -1:
@@ -937,8 +950,8 @@ class Trainer(object):
             assert len(all_milestones) > 0, 'need to have at least one milestone to load from latest checkpoint (milestone == -1)'
             milestone = max(all_milestones)
 
-        data = torch.load(str(self.results_folder / f'model-{milestone}.pt'))
-        print("Load ", str(self.results_folder / f'model-{milestone}.pt'))
+        data = torch.load(str(self.results_folder / 'weights' / f'model-{milestone}.pt'))
+        print("Load ", str(self.results_folder / 'weights' / f'model-{milestone}.pt'))
 
         self.step = data['step']
         self.model.load_state_dict(data['model'], **kwargs)
@@ -949,7 +962,7 @@ class Trainer(object):
         self,
         prob_focus_present = 0.,
         focus_present_mask = None,
-        log_fn = noop
+        log_fn = tblog
     ):
         assert callable(log_fn)
 
@@ -992,12 +1005,12 @@ class Trainer(object):
                 all_videos_list = F.pad(all_videos_list, (2, 2, 2, 2))
 
                 one_gif = rearrange(all_videos_list, '(i j) c f h w -> c f (i h) (j w)', i = self.num_sample_rows)
-                video_path = str(self.results_folder / str(f'{milestone}.gif'))
+                video_path = str(self.results_folder / 'imgs' / str(f'{milestone}.gif'))
                 video_tensor_to_gif(one_gif, video_path)
-                log = {**log, 'sample': video_path}
+                # log = {**log, 'sample': video_path}
                 self.save(milestone)
 
-            log_fn(log)
+            log_fn(log, self.step, self.writer)
             self.step += 1
 
         print('training completed')

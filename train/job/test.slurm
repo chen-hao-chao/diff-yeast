@@ -7,8 +7,8 @@
 #SBATCH --gres=gpu:4
 
 #SBATCH --time=48:00:00
-#SBATCH --output=logs/diff-yeast/results_test/slurm.out
-#SBATCH --error=logs/diff-yeast/results_test/slurm.err
+#SBATCH --output=logs/slurm.out
+#SBATCH --error=logs/slurm.err
 #SBATCH --open-mode=append
 #SBATCH --signal=B:USR1@120
 term_handler() {
@@ -19,6 +19,6 @@ source ~/.bashrc
 conda activate cellpose
 which python
 
-/h/opent03/.conda/envs/cellpose/bin/python -u train.py
+python train.py
 child="$!"
 wait "$child"

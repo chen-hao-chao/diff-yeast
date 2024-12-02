@@ -3,3 +3,5 @@ test_fig*
 gt_videos
 generate/test_fig*
 __pycache__/*
+train/wandb*
+train/results*

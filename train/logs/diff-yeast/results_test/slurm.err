@@ -1,2 +1,0 @@
-/var/spool/slurmd/job14032325/slurm_script: line 22: /h/opent03/.conda/envs/cellpose/bin/python: Permission denied
-/var/spool/slurmd/job14032325/slurm_script: line 24: wait: `': not a pid or valid job spec

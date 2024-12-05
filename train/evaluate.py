@@ -15,12 +15,14 @@
 
 """Utility functions for computing FID/Inception scores."""
 
-import jax
+# import jax
 import numpy as np
 import six
 import tensorflow as tf
 import tensorflow_gan as tfgan
 import tensorflow_hub as tfhub
+import os
+import gc
 
 INCEPTION_TFHUB = 'https://tfhub.dev/tensorflow/tfgan/eval/inception/1'
 INCEPTION_OUTPUT = 'logits'
@@ -121,11 +123,11 @@ def run_inception_distributed(input_tensor,
     A dictionary with key `pool_3` and `logits`, representing the pool_3 and
       logits of the inception network respectively.
   """
-  num_tpus = jax.local_device_count()
+  num_tpus = 1 #jax.local_device_count()
   input_tensors = tf.split(input_tensor, num_tpus, axis=0)
   pool3 = []
   logits = [] if not inceptionv3 else None
-  device_format = '/TPU:{}' if 'TPU' in str(jax.devices()[0]) else '/GPU:{}'
+  device_format = '/GPU:{}' #'/TPU:{}' if 'TPU' in str(jax.devices()[0]) else '/GPU:{}'
   for i, tensor in enumerate(input_tensors):
     with tf.device(device_format.format(i)):
       tensor_on_device = tf.identity(tensor)
@@ -144,3 +146,68 @@ def run_inception_distributed(input_tensor,
       'pool_3': tf.concat(pool3, axis=0),
       'logits': tf.concat(logits, axis=0) if not inceptionv3 else None
     }
+
+
+def encode_gt(results_folder, dl):
+    stat_dir = os.path.join(results_folder, 'stat')
+    # Construct the inception model.
+    inceptionv3 = False #config.data.image_size >= 256
+    inception_model = get_inception_model(inceptionv3=inceptionv3)
+
+    # Encodes the samples from the dataset.
+    # stats = np.load(os.path.join(stat_dir, "stat.npz"))
+    # batch_all = stats['batch']
+    # size = stats['size']
+    pools = None
+    logits = None
+    i = 0
+    for data in dl:
+        print(i)
+        i = i+1
+        # (batch, 3, frames, w, h) -> (batch, frames, w, h, 3) -> (batch*frames, w, h, 3)
+        video = data.permute(0,2,3,4,1).flatten(0,1).numpy()
+        batch = np.clip(video * 255.0, 0, 255).astype(np.uint8)
+        gc.collect()
+        latent = run_inception_distributed(batch, inception_model, inceptionv3=inceptionv3)
+        gc.collect()
+        pools = np.concatenate((pools, latent['pool_3']), axis=0) if pools is not None else latent['pool_3']
+        logits = np.concatenate((logits, latent['logits']), axis=0) if logits is not None else latent['logits']
+    
+    # Save as .npz files
+    np.savez_compressed(os.path.join(stat_dir, 'gt_latent.npz'), pool_3=latent["pool_3"], logits=latent["logits"])
+
+def encode_sample(results_folder):
+    stat_dir = os.path.join(results_folder, 'stat')
+    sample_path = os.path.join(stat_dir, "sample.npz")
+
+    # Construct the inception model.
+    inceptionv3 = False #config.data.image_size >= 256
+    inception_model = get_inception_model(inceptionv3=inceptionv3)
+    
+    # Encodes the generated samples.
+    sample = np.load(sample_path)['samples']
+    gc.collect()
+    latent = run_inception_distributed(sample, inception_model, inceptionv3=inceptionv3)
+    gc.collect()
+    # Save as .npz files
+    np.savez_compressed(os.path.join(stat_dir, 'sample_latent.npz'), pool_3=latent["pool_3"], logits=latent["logits"])
+    print("Finish encoding the generated samples.")
+
+def evaluate_fidis(results_folder):
+    '''
+    This function reads the latent files and the `stat.npz' file, and calculates the FID / IS metrics.
+    '''
+    stat_dir = os.path.join(results_folder, "stat")
+    # Load stats files
+    if os.path.exists('stat/gt_latent.npz'):
+      gt_latent = np.load('stat/gt_latent.npz')
+    else:
+      gt_latent = np.load(os.path.join(stat_dir, 'gt_latent.npz'))
+    sample_latent = np.load(os.path.join(stat_dir, 'sample_latent.npz'))
+    all_data_pool = gt_latent['pool_3']
+    all_sample_pool = sample_latent['pool_3']
+    all_sample_logits = sample_latent['logits']
+    # Compute FID / IS metrics.
+    fid = tfgan.eval.frechet_classifier_distance_from_activations(all_data_pool, all_sample_pool)
+    inception_score = tfgan.eval.classifier_score_from_logits(all_sample_logits)
+    print("FID: {:.2f} || IS: {:.2f}".format(fid.numpy(), inception_score.numpy()))

@@ -19,7 +19,7 @@ from einops_exts import check_shape, rearrange_many
 from rotary_embedding_torch import RotaryEmbedding
 
 from video_diffusion_pytorch.text import tokenize, bert_embed, BERT_MODEL_DIM
-
+import numpy as np
 # helpers functions
 
 def exists(x):
@@ -856,6 +856,7 @@ class Dataset(data.Dataset):
 
 # trainer class
 from torch.utils import tensorboard
+from evaluate import encode_gt, encode_sample, evaluate_fidis
 import wandb
 class Trainer(object):
     def __init__(
@@ -901,7 +902,8 @@ class Trainer(object):
         print(f'found {len(self.ds)} videos as gif files at {folder}')
         assert len(self.ds) > 0, 'need to have at least 1 video to start training (although 1 is not great, try 100k)'
 
-        self.dl = cycle(data.DataLoader(self.ds, batch_size = train_batch_size, shuffle=True, pin_memory=True))
+        dl = data.DataLoader(self.ds, batch_size = train_batch_size, shuffle=True, pin_memory=True)
+        self.dl = cycle(dl)
         self.opt = Adam(diffusion_model.parameters(), lr = train_lr)
 
         self.step = 0
@@ -927,7 +929,7 @@ class Trainer(object):
 
         self.reset_parameters()
         
-        encode_gt(str(self.results_folder), self.ds)
+        # encode_gt(str(self.results_folder), dl)
 
     def reset_parameters(self):
         self.ema_model.load_state_dict(self.model.state_dict())
@@ -1005,7 +1007,10 @@ class Trainer(object):
                 all_videos_list = list(map(lambda n: self.ema_model.sample(batch_size=n), batches))
                 all_videos_list = torch.cat(all_videos_list, dim = 0)
                 # save videos
-                np.savez_compressed(str(self.results_folder / 'stat' / 'sample.npz'), samples=all_videos_list)
+                samples = all_videos_list.permute(0,2,3,4,1).flatten(0,1).detach().cpu().numpy()
+                np.savez_compressed(str(self.results_folder / 'stat' / 'sample.npz'), samples=samples)
+                encode_sample(str(self.results_folder))
+                evaluate_fidis(str(self.results_folder))
 
                 all_videos_list = F.pad(all_videos_list, (2, 2, 2, 2))
 
@@ -1019,66 +1024,6 @@ class Trainer(object):
             self.step += 1
 
         print('training completed')
-
-import evaluation
-def encode_gt(results_folder, ds):
-    stat_dir = os.path.join(results_folder, 'stat')
-    # Construct the inception model.
-    inceptionv3 = config.data.image_size >= 256
-    inception_model = evaluation.get_inception_model(inceptionv3=inceptionv3)
-
-    # Encodes the samples from the dataset.
-    stats = np.load(os.path.join(stat_dir, "stat.npz"))
-    batch_all = stats['batch']
-    size = stats['size']
-    pools = None
-    logits = None
-    for i in range(len(ds)):
-        video = next(self.dl).numpy()
-        print(video.shape)
-        assert False
-        batch = np.clip( * 255.0, 0, 255).astype(np.uint8)
-        gc.collect()
-        latent = evaluation.run_inception_distributed(batch, inception_model, inceptionv3=inceptionv3)
-        gc.collect()
-        pools = np.concatenate((pools, latent['pool_3']), axis=0) if pools is not None else latent['pool_3']
-        logits = np.concatenate((logits, latent['logits']), axis=0) if logits is not None else latent['logits']
-    
-    # Save as .npz files
-    np.savez_compressed(os.path.join(stat_dir, 'gt_latent.npz'), pool_3=latent["pool_3"], logits=latent["logits"])
-
-def encode_latent(results_folder):
-    stat_dir = os.path.join(results_folder, 'stat')
-    sample_path = os.path.join(stat_dir, "samples.npz")
-
-    # Construct the inception model.
-    inceptionv3 = config.data.image_size >= 256
-    inception_model = evaluation.get_inception_model(inceptionv3=inceptionv3)
-    
-    # Encodes the generated samples.
-    sample = np.load(sample_path)['samples']
-    gc.collect()
-    latent = evaluation.run_inception_distributed(sample, inception_model, inceptionv3=inceptionv3)
-    gc.collect()
-    # Save as .npz files
-    np.savez_compressed(os.path.join(stat_dir, 'sample_latent.npz'), pool_3=latent["pool_3"], logits=latent["logits"])
-    print("Finish encoding the generated samples.")
-
-def evaluate_fidis(config, workdir):
-    '''
-    This function reads the latent files and the `stat.npz' file, and calculates the FID / IS metrics.
-    '''
-    stat_dir = os.path.join(workdir, "stat")
-    # Load stats files
-    gt_latent = np.load(os.path.join(stat_dir, 'gt_latent.npz'))
-    sample_latent = np.load(os.path.join(stat_dir, 'sample_latent.npz'))
-    all_data_pool = gt_latent['pool_3']
-    all_sample_pool = sample_latent['pool_3']
-    all_sample_logits = sample_latent['logits']
-    # Compute FID / IS metrics.
-    fid = tfgan.eval.frechet_classifier_distance_from_activations(all_data_pool, all_sample_pool)
-    inception_score = tfgan.eval.classifier_score_from_logits(all_sample_logits)
-    print("FID: {:.2f} || IS: {:.2f}".format(fid.numpy(), inception_score.numpy()))
 
 class Evaluator(object):
     def __init__(

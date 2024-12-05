@@ -5,3 +5,4 @@ generate/test_fig*
 __pycache__/*
 train/wandb*
 train/results*
+train/logs*

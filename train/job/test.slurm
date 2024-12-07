@@ -4,7 +4,7 @@
 #SBATCH --qos=a100_chchao
 #SBATCH --partition=a100
 #SBATCH --mem=64G
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 
 #SBATCH --time=48:00:00
 #SBATCH --output=logs/slurm.out

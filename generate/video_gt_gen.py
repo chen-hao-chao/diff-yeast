@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-from dataloader import MyData
+from dataloader import CellDataLoader
 from utils import generate_gif, determine_center, visualize, add_outline, rotate_to_normalize, flip_to_normalize, aggregate_masks
 from utils import iou_compute, similarity_compute, score_compute, angle_sim_compute
 from utils import normalize_intensity, merge, pseudo_segmentation
@@ -51,12 +51,26 @@ def main(cfg : DictConfig) -> None:
         print("Directory exists.")
 
     loaded_df = pd.read_csv('/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv')
+    root_dir='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/R1'
+    root_dir_no_gfp='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/no_GFP/R1'
     df_list = []
+    df_no_gfp_list = []
     for i in range(6):
         print("Loading the ", str(i), "-th stage...")
         df = loaded_df[loaded_df['correctedMaxCycle_num'] == i]
         df = df[df['ORF'] == ORF]["filename"].apply(literal_eval)
-        df_list.append(df[df.index.values.astype(int)[0]])
+        file = df[df.index.values.astype(int)[0]]
+        df_list.append(file)
+
+        # df_no_gfp_sublist = []
+        # for file_path in file:
+        #     p = os.path.join(root_dir_no_gfp, file_path)
+        #     print(p)
+        #     if os.path.exists(p):
+        #         df_no_gfp_sublist.append(file_path)
+        #         print(file_path)
+        # df_no_gfp_list.append(df_no_gfp_sublist)
+        # assert False
 
     for rand_idx in range(10): #len(df_list[0])
         # rand number
@@ -64,7 +78,7 @@ def main(cfg : DictConfig) -> None:
         rnd_1 = random.uniform(-1, 1)
         rnd_2 = random.uniform(-1, 1)
         rnd_3 = random.uniform(-1, 1)
-        rnd_4 = randrange(3)
+        rnd_4 = randrange(5)
 
         img_idx = rnd_0
         balance_fac = args.balance_fac + rnd_1 * 0.2
@@ -90,22 +104,26 @@ def main(cfg : DictConfig) -> None:
         for i in range(6): 
             print("Calculating the ", str(i), "-th stage...")
             all_choices = df_list[i]
-            dataset = MyData(root_dir='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/R1', data_list=all_choices, phase=0)
+            dataset = CellDataLoader(root_dir=root_dir, root_dir_no_gfp=root_dir_no_gfp, data_list=all_choices)
             data_loader = DataLoader(dataset, batch_size=bs, shuffle=False)
             if i == 0:
                 imgs_channel_2 = None
                 imgs_channel_1 = None
                 imgs_channel_0 = None
+                imgs_no_gfp_channel_0 = None
                 batch_count = 0
-                for imgs, labels in data_loader:
+                for imgs, imgs_no_gfp in data_loader:
                     imgs_channel_2 = imgs[:,2,:,:].numpy()
                     imgs_channel_1 = imgs[:,1,:,:].numpy()
                     imgs_channel_0 = imgs[:,0,:,:].numpy()
+                    # imgs_no_gfp_channel_0 = imgs_no_gfp[:,0,:,:].numpy()
                     if batch_count == (img_idx // bs):
                         break
                     else:
                         batch_count = batch_count + 1
 
+                # visualize(imgs_no_gfp_channel_0)
+                # assert False
                 masks_2, imgs_dn_2 = pseudo_segmentation([imgs_channel_2[img_idx % bs]])
                 masks_1, imgs_dn_1 = pseudo_segmentation([imgs_channel_1[img_idx % bs]])
                 masks_0, imgs_dn_0 = pseudo_segmentation([imgs_channel_0[img_idx % bs]])
@@ -132,7 +150,7 @@ def main(cfg : DictConfig) -> None:
                 img_list_1 = []
                 img_list_0 = []
                 idx = 0
-                for imgs, labels in data_loader:
+                for imgs, imgs_no_gfp in data_loader:
                     imgs_channel_2 = imgs[:,2,:,:].numpy()
                     imgs_channel_1 = imgs[:,1,:,:].numpy()
                     imgs_channel_0 = imgs[:,0,:,:].numpy()

@@ -22,12 +22,19 @@ def normalize_intensity(img, avg=0.2):
         img = np.clip(img + (avg-np.mean(img)), 0, 1)
     return (img * 255).astype(np.uint8)
 
+# Source: https://stackoverflow.com/questions/33548639/how-can-i-smooth-elements-of-a-two-dimensional-array-with-differing-gaussian-fun
+import scipy as sp
+def smooth_mask(mask, sigma=1):
+    mask = sp.ndimage.filters.gaussian_filter(mask, sigma, mode='constant')
+    return mask
+
 def merge(img_2, img_1, img_0, mask, apply_mask=True, mode='default'):
     # img_2: (64,64,1) is the base 
     # img_1: (64,64,1) takes the R channel
     # img_0: (64,64,1) takes the G channel
     # mask: (64,64,1) is a segmentation mask
     # ---------
+    mask = smooth_mask(mask)
     img_2 = img_2.squeeze()*mask if apply_mask else img_2.squeeze()
     img_1 = img_1.squeeze()*mask if apply_mask else img_1.squeeze()
     img_0 = img_0.squeeze()*mask if apply_mask else img_0.squeeze()
@@ -243,10 +250,14 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     # for j in range(len(tf_id)):
     #     tf_id[j] = tf_id[j] - int(len(gif)//4)
     # gif = gif[len(gif)//4:]
-    # gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
+    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
+    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
+    # gif, tf_id = interpolate(gif, tf_id, model)
     gif, tf_id = interpolate(gif, tf_id, model)
     gif, tf_id = interpolate(gif, tf_id, model)
-    gif, tf_id = interpolate(gif, tf_id, model)
+    # for i in range(40):
+    #     gif.append(gif[-1])
+    #     tf_id.append(len(gif))
     print("Length: ", len(gif), len(tf_id))
 
     media.show_video(gif, fps=100, title=filename, codec='gif', border=True)

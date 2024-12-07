@@ -840,9 +840,9 @@ class Dataset(data.Dataset):
         self.cast_num_frames_fn = partial(cast_num_frames, frames = num_frames, split=split) if force_num_frames else identity
 
         self.transform = T.Compose([
-            # T.Resize(image_size),
+            # T.CenterCrop(image_size),
+            T.Resize(image_size),
             T.RandomHorizontalFlip() if horizontal_flip else T.Lambda(identity),
-            T.CenterCrop(image_size),
             T.ToTensor()
         ])
 
@@ -963,6 +963,14 @@ class Trainer(object):
         self.ema_model.load_state_dict(data['ema'], **kwargs)
         self.scaler.load_state_dict(data['scaler'])
 
+    def gen_samples(self, batches, i):
+        all_videos_list = list(map(lambda n: self.ema_model.sample(batch_size=n), batches))
+        all_videos_list = torch.cat(all_videos_list, dim = 0)
+        # save videos
+        samples = all_videos_list.permute(0,2,3,4,1).flatten(0,1).detach().cpu().numpy()
+        np.savez_compressed(str(self.results_folder / 'stat' / 'sample_'+str(i)+'.npz'), samples=samples)
+        return all_videos_list
+
     def train(
         self,
         prob_focus_present = 0.,
@@ -1004,13 +1012,11 @@ class Trainer(object):
                 num_samples = self.num_sample_rows ** 2
                 batches = num_to_groups(num_samples, self.batch_size)
 
-                all_videos_list = list(map(lambda n: self.ema_model.sample(batch_size=n), batches))
-                all_videos_list = torch.cat(all_videos_list, dim = 0)
-                # save videos
-                samples = all_videos_list.permute(0,2,3,4,1).flatten(0,1).detach().cpu().numpy()
-                np.savez_compressed(str(self.results_folder / 'stat' / 'sample.npz'), samples=samples)
+                for i in range(10):
+                    all_videos_list = self.gen_samples(batches, i)
+                
                 encode_sample(str(self.results_folder))
-                evaluate_fidis(str(self.results_folder))
+                fid_, is_ = evaluate_fidis(str(self.results_folder))
 
                 all_videos_list = F.pad(all_videos_list, (2, 2, 2, 2))
 
@@ -1018,6 +1024,7 @@ class Trainer(object):
                 video_path = str(self.results_folder / 'imgs' / str(f'{milestone}.gif'))
                 video_tensor_to_gif(one_gif, video_path)
                 # log = {**log, 'sample': video_path}
+                log = {**log, 'fid': fid_, 'is': is_}
                 self.save(milestone)
 
             log_fn(log, self.step, self.writer)

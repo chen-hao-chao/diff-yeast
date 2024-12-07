@@ -3,10 +3,10 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import tifffile as tiff
 
-class MyData(Dataset):
-    def __init__(self, root_dir, data_list, phase):
+class CellDataLoader(Dataset):
+    def __init__(self, root_dir, root_dir_no_gfp, data_list):
         self.data_list = data_list
-        self.phase = phase
+        self.root_dir_no_gfp = root_dir_no_gfp
         self.root_dir = root_dir
 
     def __len__(self):
@@ -14,5 +14,5 @@ class MyData(Dataset):
 
     def __getitem__(self, index):
         image = tiff.imread(os.path.join(self.root_dir, self.data_list[index]))
-        label = self.phase
-        return image, label
+        image_no_gfp = 0 #tiff.imread(os.path.join(self.root_dir_no_gfp, self.data_list[index]))
+        return image, image_no_gfp

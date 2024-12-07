@@ -155,9 +155,6 @@ def encode_gt(results_folder, dl):
     inception_model = get_inception_model(inceptionv3=inceptionv3)
 
     # Encodes the samples from the dataset.
-    # stats = np.load(os.path.join(stat_dir, "stat.npz"))
-    # batch_all = stats['batch']
-    # size = stats['size']
     pools = None
     logits = None
     i = 0
@@ -211,3 +208,4 @@ def evaluate_fidis(results_folder):
     fid = tfgan.eval.frechet_classifier_distance_from_activations(all_data_pool, all_sample_pool)
     inception_score = tfgan.eval.classifier_score_from_logits(all_sample_logits)
     print("FID: {:.2f} || IS: {:.2f}".format(fid.numpy(), inception_score.numpy()))
+    return fid.numpy(), inception_score.numpy()

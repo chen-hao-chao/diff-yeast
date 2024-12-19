@@ -1012,7 +1012,7 @@ class Trainer(object):
                 num_samples = self.num_sample_rows ** 2
                 batches = num_to_groups(num_samples, self.batch_size)
 
-                for i in range(10):
+                for i in range(20):
                     all_videos_list = self.gen_samples(batches, i)
                 
                 encode_sample(str(self.results_folder))

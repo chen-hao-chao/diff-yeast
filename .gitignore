@@ -3,7 +3,7 @@ test_fig*
 gt_videos
 generate/test_fig*
 __pycache__/*
-train/wandb*
-train/results*
-train/logs*
-train/stat*
+vdm/wandb*
+vdm/results*
+vdm/logs*
+vdm/stat*

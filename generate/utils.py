@@ -14,6 +14,11 @@ def pseudo_segmentation(img_list):
         masks.append(mask)
     return masks, img_list
 
+def shift_intensity(img, value=0):
+    img = img - value 
+    img = np.clip(img, a_min=0, a_max=None)
+    return img
+
 def normalize_intensity(img, avg=0.2):
     # Normalize the intensity to avg.
     # Set avg=0 to deactivate the avgerage shifting operation.
@@ -34,7 +39,7 @@ def merge(img_2, img_1, img_0, mask, apply_mask=True, mode='default'):
     # img_0: (64,64,1) takes the G channel
     # mask: (64,64,1) is a segmentation mask
     # ---------
-    mask = smooth_mask(mask)
+    mask = smooth_mask(mask, sigma=3)
     img_2 = img_2.squeeze()*mask if apply_mask else img_2.squeeze()
     img_1 = img_1.squeeze()*mask if apply_mask else img_1.squeeze()
     img_0 = img_0.squeeze()*mask if apply_mask else img_0.squeeze()
@@ -156,6 +161,7 @@ from mediapy import set_show_save_dir
 from PIL import Image
 
 def visualize(data, filename, mode='L'):
+    # data should be within the range [0,255]
     img = Image.fromarray(np.uint8(data), mode)
     img.save(filename)
 
@@ -250,28 +256,18 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     # for j in range(len(tf_id)):
     #     tf_id[j] = tf_id[j] - int(len(gif)//4)
     # gif = gif[len(gif)//4:]
-    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
-    gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
-    # gif, tf_id = interpolate(gif, tf_id, model)
+    # gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
+    # gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
     gif, tf_id = interpolate(gif, tf_id, model)
     gif, tf_id = interpolate(gif, tf_id, model)
-    # for i in range(40):
-    #     gif.append(gif[-1])
-    #     tf_id.append(len(gif))
+    gif, tf_id = interpolate(gif, tf_id, model)
+    for i in range(50):
+        gif.append(gif[-1])
+        tf_id.append(len(gif))
     print("Length: ", len(gif), len(tf_id))
 
     media.show_video(gif, fps=100, title=filename, codec='gif', border=True)
     np.savetxt(filename+'.txt', tf_id, fmt='%d')
-    # write_video(gif, filename+'_video.mp4')
-
-# def write_video(gif, filename):
-#     out = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), 5, (64,64))
-#     for i in range(len(gif)):
-#         img = np.copy(gif[i])
-#         img[:,:,0] = gif[i][:,:,2] # 1 <- 2
-#         img[:,:,2] = gif[i][:,:,0]
-#         out.write(img)
-#     out.release()
 
 def stack_imgs(img1, img2, img3):
     # output: 3x64x64

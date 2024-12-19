@@ -4,7 +4,7 @@ import os
 from dataloader import CellDataLoader
 from utils import generate_gif, determine_center, visualize, add_outline, rotate_to_normalize, flip_to_normalize, aggregate_masks
 from utils import iou_compute, similarity_compute, score_compute, angle_sim_compute
-from utils import normalize_intensity, merge, pseudo_segmentation
+from utils import normalize_intensity, merge, pseudo_segmentation, shift_intensity
 
 import tifffile as tiff
 import pandas as pd
@@ -31,6 +31,15 @@ from omegaconf import DictConfig
 import argparse
 from random import randrange
 
+def set_deterministic(seed):
+    # Pytorch
+    torch.manual_seed(seed)
+    # Numpy
+    np.random.seed(seed)
+    # Random
+    random.seed(seed)
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="base")
 def main(cfg : DictConfig) -> None:
     cfg = flatten_cfg(cfg)
@@ -41,6 +50,7 @@ def main(cfg : DictConfig) -> None:
     split_stage = args.split_stage
     mode = 'default' #'structure' #'default'
     avg = 0.125 #0.2 #0.125
+    set_deterministic(0)
 
     target_dir = './test_fig' #'/datasets/yeast-imgs/gt_videos/R1'
     target_path = os.path.join(target_dir, ORF)
@@ -49,10 +59,25 @@ def main(cfg : DictConfig) -> None:
         print("Create a new directory: ", target_path)
     else:
         print("Directory exists.")
+    
+    root_dir_no_gfp='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/no_GFP/R1'
+    df_no_gfp_sublist = [f for f in os.listdir(root_dir_no_gfp) if f.split('.')[1]=='tiff']
+    dataset_no_gfp = CellDataLoader(root_dir=root_dir_no_gfp, data_list=df_no_gfp_sublist)
+    data_loader_no_gfp = DataLoader(dataset_no_gfp, batch_size=len(df_no_gfp_sublist), shuffle=False)
+
+    mean_value = 0
+    for imgs in data_loader_no_gfp:
+        imgs_channel_no_gfp_0 = imgs[:,0,:,:].numpy()
+        imgs_channel_no_gfp_0 = imgs_channel_no_gfp_0
+        mean_value = np.mean(imgs_channel_no_gfp_0[imgs_channel_no_gfp_0 != 0])
+        # mean_value = np.median(imgs_channel_no_gfp_0[imgs_channel_no_gfp_0 != 0])
+        # mean_value = np.max(imgs_channel_no_gfp_0[imgs_channel_no_gfp_0 != 0])
+        print(mean_value)
+        break
 
     loaded_df = pd.read_csv('/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv')
     root_dir='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/R1'
-    root_dir_no_gfp='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/no_GFP/R1'
+    
     df_list = []
     df_no_gfp_list = []
     for i in range(6):
@@ -62,23 +87,13 @@ def main(cfg : DictConfig) -> None:
         file = df[df.index.values.astype(int)[0]]
         df_list.append(file)
 
-        # df_no_gfp_sublist = []
-        # for file_path in file:
-        #     p = os.path.join(root_dir_no_gfp, file_path)
-        #     print(p)
-        #     if os.path.exists(p):
-        #         df_no_gfp_sublist.append(file_path)
-        #         print(file_path)
-        # df_no_gfp_list.append(df_no_gfp_sublist)
-        # assert False
-
-    for rand_idx in range(10): #len(df_list[0])
+    for rand_idx in range(5): #len(df_list[0])
         # rand number
         rnd_0 = randrange(len(df_list[0]))
         rnd_1 = random.uniform(-1, 1)
-        rnd_2 = random.uniform(-1, 1)
+        rnd_2 = 0 #random.uniform(-1, 1)
         rnd_3 = random.uniform(-1, 1)
-        rnd_4 = randrange(5)
+        rnd_4 = randrange(7) # -> 3
 
         img_idx = rnd_0
         balance_fac = args.balance_fac + rnd_1 * 0.2
@@ -104,26 +119,22 @@ def main(cfg : DictConfig) -> None:
         for i in range(6): 
             print("Calculating the ", str(i), "-th stage...")
             all_choices = df_list[i]
-            dataset = CellDataLoader(root_dir=root_dir, root_dir_no_gfp=root_dir_no_gfp, data_list=all_choices)
+            dataset = CellDataLoader(root_dir=root_dir, data_list=all_choices)
             data_loader = DataLoader(dataset, batch_size=bs, shuffle=False)
             if i == 0:
                 imgs_channel_2 = None
                 imgs_channel_1 = None
                 imgs_channel_0 = None
-                imgs_no_gfp_channel_0 = None
                 batch_count = 0
-                for imgs, imgs_no_gfp in data_loader:
+                for imgs in data_loader:
                     imgs_channel_2 = imgs[:,2,:,:].numpy()
                     imgs_channel_1 = imgs[:,1,:,:].numpy()
                     imgs_channel_0 = imgs[:,0,:,:].numpy()
-                    # imgs_no_gfp_channel_0 = imgs_no_gfp[:,0,:,:].numpy()
                     if batch_count == (img_idx // bs):
                         break
                     else:
                         batch_count = batch_count + 1
 
-                # visualize(imgs_no_gfp_channel_0)
-                # assert False
                 masks_2, imgs_dn_2 = pseudo_segmentation([imgs_channel_2[img_idx % bs]])
                 masks_1, imgs_dn_1 = pseudo_segmentation([imgs_channel_1[img_idx % bs]])
                 masks_0, imgs_dn_0 = pseudo_segmentation([imgs_channel_0[img_idx % bs]])
@@ -134,7 +145,7 @@ def main(cfg : DictConfig) -> None:
 
                 img_2 = normalize_intensity(imgs_dn_2[0], avg=avg)
                 img_1 = normalize_intensity(imgs_dn_1[0], avg=avg)
-                img_0 = normalize_intensity(imgs_dn_0[0], avg=avg)
+                img_0 = normalize_intensity(shift_intensity(imgs_dn_0[0], mean_value), avg=avg)
 
                 img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
@@ -150,7 +161,7 @@ def main(cfg : DictConfig) -> None:
                 img_list_1 = []
                 img_list_0 = []
                 idx = 0
-                for imgs, imgs_no_gfp in data_loader:
+                for imgs in data_loader:
                     imgs_channel_2 = imgs[:,2,:,:].numpy()
                     imgs_channel_1 = imgs[:,1,:,:].numpy()
                     imgs_channel_0 = imgs[:,0,:,:].numpy()
@@ -175,7 +186,7 @@ def main(cfg : DictConfig) -> None:
 
                     img_2 = normalize_intensity(imgs_dn_2[k], avg=avg)
                     img_1 = normalize_intensity(imgs_dn_1[k], avg=avg)
-                    img_0 = normalize_intensity(imgs_dn_0[k], avg=avg)
+                    img_0 = normalize_intensity(shift_intensity(imgs_dn_0[k], mean_value), avg=avg)
                 
                     img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 

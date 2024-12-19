@@ -6,7 +6,7 @@ import numpy as np
 directory_tfid = 'test_fig'
 directory = 'test_fig_sharpened_title'
 output_directory = 'test_fig_sharpened_title_tfid'
-num_frames = 10
+num_frames = 5
 try:
     os.mkdir(output_directory) 
 except:

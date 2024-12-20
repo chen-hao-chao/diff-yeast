@@ -26,6 +26,49 @@ from tools.data_utils import *
 
 import av
 
+from pathlib import Path
+from functools import partial
+def cast_num_frames(t, *, frames, split):
+    f = t.shape[1]
+    all_frames = t[:, ::split]
+    return all_frames[:, :frames]
+def identity(t, *args, **kwargs):
+    return t
+class CellDataset(Dataset):
+    def __init__(
+        self,
+        folder,
+        image_size,
+        channels = 3,
+        num_frames = 16,
+        split = 1,
+        horizontal_flip = False,
+        force_num_frames = True,
+        exts = ['gif']
+    ):
+        super().__init__()
+        self.folder = folder
+        self.image_size = image_size
+        self.channels = channels
+        self.paths = [p for ext in exts for p in Path(f'{folder}').glob(f'**/*.{ext}')]
+
+        self.cast_num_frames_fn = partial(cast_num_frames, frames = num_frames, split=split) if force_num_frames else identity
+
+        self.transform = T.Compose([
+            # T.CenterCrop(image_size),
+            T.Resize(image_size),
+            T.RandomHorizontalFlip() if horizontal_flip else T.Lambda(identity),
+            T.ToTensor()
+        ])
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, index):
+        path = self.paths[index]
+        tensor = gif_to_tensor(path, self.channels, transform = self.transform)
+        return self.cast_num_frames_fn(tensor)
+
 class VideoFolderDataset(Dataset):
     def __init__(self,
                  root,
@@ -273,7 +316,18 @@ def get_loaders(rank, imgstr, resolution, timesteps, skip, batch_size=1, n_gpus=
     """
     Load dataloaders for an image dataset, center-cropped to a resolution.
     """
-    if imgstr == 'UCF101':
+    if imgstr == 'Cell':
+        train_dir = os.path.join('../gt_videos')
+        test_dir = os.path.join('../gt_videos') # We use all 
+        if cond:
+            print("here")
+            timesteps *= 2 # for long generation
+        trainset = CellDataset(train_dir, resolution, num_frames = timesteps)
+        print(len(trainset))
+        testset = CellDataset(train_dir, resolution, num_frames = timesteps)
+        print(len(testset))
+
+    elif imgstr == 'UCF101':
         train_dir = os.path.join(data_location, 'UCF-101')
         test_dir = os.path.join(data_location, 'UCF-101') # We use all 
         if cond:

@@ -77,7 +77,9 @@ def first_stage(rank, args):
     """ Get Image """
     if rank == 0:
         log_(f"Loading dataset {args.data} with resolution {args.res}")
+    
     train_loader, test_loader, total_vid = get_loaders(rank, args.data, args.res, args.timesteps, args.skip, args.batch_size, args.n_gpus, args.seed, cond=False)
+    print("successful loaded")
 
     """ Get Model """
     if rank == 0:

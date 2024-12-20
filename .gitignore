@@ -7,3 +7,4 @@ vdm/wandb*
 vdm/results*
 vdm/logs*
 vdm/stat*
+pvdm/results*

@@ -48,7 +48,7 @@ def latentDDPM(rank, first_stage_model, model, opt, criterion, train_loader, tes
     first_stage_model.eval()
     model.train()
 
-    for it, (x, _) in enumerate(train_loader):
+    for it, x in enumerate(train_loader):
         x = x.to(device)
         x = rearrange(x / 127.5 - 1, 'b t c h w -> b c t h w') # videos
         c = None
@@ -134,7 +134,7 @@ def latentDDPM(rank, first_stage_model, model, opt, criterion, train_loader, tes
                      (time.time() - check, fvd))
 
 
-def first_stage_train(rank, model, opt, d_opt, criterion, train_loader, test_loader, first_model, fp, logger=None):
+def first_stage_train(rank, model, opt, d_opt, criterion, train_loader, test_loader, first_model, fp, logger=None, n_gpus=1):
     if logger is None:
         log_ = print
     else:
@@ -157,17 +157,21 @@ def first_stage_train(rank, model, opt, d_opt, criterion, train_loader, test_loa
         scaler = GradScaler()
         scaler_d = GradScaler()
 
-        try:
-            scaler.load_state_dict(torch.load(os.path.join(first_model, 'scaler.pth')))
-            scaler_d.load_state_dict(torch.load(os.path.join(first_model, 'scaler_d.pth')))
-        except:
-            print("Fail to load scalers. Start from initial point.")
+        # try:
+        #     print("Loading first models...")
+        #     scaler.load_state_dict(torch.load(os.path.join(first_model, 'scaler.pth')))
+        #     scaler_d.load_state_dict(torch.load(os.path.join(first_model, 'scaler_d.pth')))
+        # except:
+        #     print("Fail to load scalers. Start from initial point.")
 
 
     model.train()
-    disc_start = criterion.module.discriminator_iter_start
+    if n_gpus > 1:
+        disc_start = criterion.module.discriminator_iter_start
+    else:
+        disc_start = criterion.discriminator_iter_start
     
-    for it, (x, _) in enumerate(train_loader):
+    for it, x in enumerate(train_loader):
 
         if it > 1000000:
             break
@@ -175,6 +179,7 @@ def first_stage_train(rank, model, opt, d_opt, criterion, train_loader, test_loa
 
         x = x.to(device)
         x = rearrange(x / 127.5 - 1, 'b t c h w -> b c t h w') # videos
+        print(x.shape)
 
         if not disc_opt:
             with autocast():

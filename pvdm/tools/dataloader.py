@@ -28,6 +28,27 @@ import av
 
 from pathlib import Path
 from functools import partial
+CHANNELS_TO_MODE = {
+    1 : 'L',
+    3 : 'RGB',
+    4 : 'RGBA'
+}
+def seek_all_images(img, channels = 3):
+    assert channels in CHANNELS_TO_MODE, f'channels {channels} invalid'
+    mode = CHANNELS_TO_MODE[channels]
+    i = 0
+    while True:
+        try:
+            img.seek(i)
+            yield img.convert(mode)
+        except EOFError:
+            break
+        i += 1
+
+def gif_to_tensor(path, channels = 3, transform = T.ToTensor()):
+    img = Image.open(path)
+    tensors = tuple(map(transform, seek_all_images(img, channels = channels)))
+    return torch.stack(tensors, dim = 1)
 def cast_num_frames(t, *, frames, split):
     f = t.shape[1]
     all_frames = t[:, ::split]
@@ -67,7 +88,7 @@ class CellDataset(Dataset):
     def __getitem__(self, index):
         path = self.paths[index]
         tensor = gif_to_tensor(path, self.channels, transform = self.transform)
-        return self.cast_num_frames_fn(tensor)
+        return self.cast_num_frames_fn(tensor).float().permute(1,0,2,3)
 
 class VideoFolderDataset(Dataset):
     def __init__(self,

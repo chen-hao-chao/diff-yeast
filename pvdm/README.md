@@ -124,6 +124,9 @@ Here, `[EXP_NAME]` is an experiment name you want to specifiy (string), `[DATASE
  --data UCF101 \
  --batch_size 8 \
  --first_stage_folder 'results/first_stage_main_UCF101_42/'
+
+
+python main.py --exp first_stage --id main --pretrain_config configs/autoencoder/base_cell.yaml --data Cell --batch_size 8 
 ```
 
 You may change the model configs via modifying `configs/autoencoder`. Moreover, one needs early-stopping to further train the model with the GAN loss (typically 8k-14k iterations with a batch size of 8).

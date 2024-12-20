@@ -89,8 +89,9 @@ def first_stage(rank, args):
     model = ViTAutoencoder(args.embed_dim, args.ddconfig)
     model = model.to(device)
 
-    criterion = LPIPSWithDiscriminator(disc_start   = args.lossconfig.params.disc_start,
-                                       timesteps    = args.ddconfig.timesteps).to(device)
+    criterion = LPIPSWithDiscriminator(disc_start     = args.lossconfig.params.disc_start,
+                                       timesteps      = args.ddconfig.timesteps, 
+                                       norm_layer_syn = 1 if args.n_gpus>1 else 0).to(device)
 
 
     opt = torch.optim.AdamW(model.parameters(), 
@@ -125,7 +126,7 @@ def first_stage(rank, args):
                                                       find_unused_parameters=False)
 
     fp = args.amp
-    first_stage_train(rank, model, opt, d_opt, criterion, train_loader, test_loader, args.first_model, fp, logger)
+    first_stage_train(rank, model, opt, d_opt, criterion, train_loader, test_loader, args.first_model, fp, logger, n_gpus=args.n_gpus)
 
     if rank == 0:
         torch.save(model.state_dict(), rootdir + f'net_meta.pth')

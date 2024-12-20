@@ -66,20 +66,27 @@ class LPIPSWithDiscriminator(nn.Module):
     def __init__(self, disc_start, disc_num_layers=3, disc_in_channels=3, 
                  pixelloss_weight=4.0, disc_weight=1.0,
                  perceptual_weight=4.0, feature_weight=4.0,
-                 disc_ndf=64, disc_loss="hinge", timesteps=16):
+                 disc_ndf=64, disc_loss="hinge", timesteps=16, norm_layer_syn=1):
         super().__init__()
         assert disc_loss in ["hinge", "vanilla"]
         self.s = timesteps
         self.perceptual_loss = LPIPS().eval()
         self.pixel_loss = l1
+
+        norm_layer = nn.SyncBatchNorm if norm_layer_syn == 1 else nn.BatchNorm2d
  
         self.discriminator_2d = NLayerDiscriminator(input_nc=disc_in_channels,
                                                  n_layers=disc_num_layers,
-                                                 ndf=disc_ndf
+                                                 ndf=disc_ndf,
+                                                 norm_layer=norm_layer
                                                  ).apply(weights_init)
+        
+        norm_layer = nn.SyncBatchNorm if norm_layer_syn == 1 else nn.BatchNorm3d
+
         self.discriminator_3d = NLayerDiscriminator3D(input_nc=disc_in_channels,
                                                  n_layers=disc_num_layers,
-                                                 ndf=disc_ndf
+                                                 ndf=disc_ndf,
+                                                 norm_layer=norm_layer
                                                  ).apply(weights_init)
 
         self.discriminator_iter_start = disc_start

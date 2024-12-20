@@ -47,7 +47,7 @@ def test_psnr(rank, model, loader, it, logger=None):
 
     model.eval()
     with torch.no_grad():
-        for n, (x, _) in enumerate(loader):
+        for n, x in enumerate(loader):
             if n > 100:
                 break
             batch_size = x.size(0)
@@ -83,7 +83,7 @@ def test_ifvd(rank, model, loader, it, logger=None):
     i3d = load_i3d_pretrained(device)
 
     with torch.no_grad():
-        for n, (real, idx) in enumerate(loader):
+        for n, real in enumerate(loader):
             if n > 512:
                 break
             batch_size = real.size(0)
@@ -152,7 +152,7 @@ def test_fvd_ddpm(rank, ema_model, decoder, loader, it, logger=None):
 
     if cond_model:
         with torch.no_grad():        
-            for n, (x, _) in enumerate(loader):
+            for n, x in enumerate(loader):
                 k = min(4, x.size(0))
                 if n >= 4:
                     break
@@ -206,7 +206,7 @@ def test_fvd_ddpm(rank, ema_model, decoder, loader, it, logger=None):
             logger.video_summary('prediction', pred_vid, it)
     else:
         with torch.no_grad():        
-            for n, (real, _) in enumerate(loader):
+            for n, real in enumerate(loader):
                 if n >= 4:
                     break
                 real = rearrange(real, 'b t c h w -> b t h w c')

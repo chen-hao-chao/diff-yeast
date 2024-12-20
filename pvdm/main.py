@@ -20,7 +20,7 @@ parser.add_argument('--id', type=str, default='main', help='experiment identifie
 
 """ Args about Data """
 parser.add_argument('--data', type=str, default='UCF101')
-parser.add_argument('--batch_size', type=int, default=24)
+parser.add_argument('--batch_size', type=int, default=1)
 parser.add_argument('--ds', type=int, default=4)
 
 """ Args about Model """
@@ -45,6 +45,7 @@ def main():
 
 
     args.n_gpus = torch.cuda.device_count()
+    print("number of gpu: ", args.n_gpus)
 
     # init and save configs
     

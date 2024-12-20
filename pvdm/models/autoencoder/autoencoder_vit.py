@@ -104,6 +104,8 @@ class ViTAutoencoder(nn.Module):
         if self.res == 128:
             patch_size = 4
         self.down = 3
+        if self.res == 128:
+            self.down = 2
 
         self.encoder = TimeSformerEncoder(dim=ddconfig["channels"],
                                    image_size=ddconfig["resolution"],
@@ -170,6 +172,7 @@ class ViTAutoencoder(nn.Module):
         h_yt = rearrange(h_yt, '(b t w) c -> b c t w', b=b, w=self.res//(2**self.down))
 
         h_xt = rearrange(h, 'b c t h w -> (b t h) w c')
+        # print(h_xt.shape)
         n = h_xt.size(1)
         xt_token = repeat(self.xt_token, '1 1 d -> bth 1 d', bth = h_xt.size(0))
         h_xt = torch.cat([h_xt, xt_token], dim=1)

@@ -2,12 +2,12 @@ import imageio.v3 as iio
 import cv2
 import os
 from utils import add_outline, interpolate, visualize, sharpen
-from cellpose import utils, denoise, io
-import numpy as np
-import tensorflow_hub as hub
+# from cellpose import utils, denoise, io
+# import numpy as np
+# import tensorflow_hub as hub
 
-model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
-model_inter = hub.load("https://tfhub.dev/google/film/1")
+# model = denoise.CellposeDenoiseModel(gpu=True, model_type="cyto3",restore_type="denoise_cyto3")
+# model_inter = hub.load("https://tfhub.dev/google/film/1")
 
 directory = 'test_fig'
 output_directory = 'test_fig_sharpened'

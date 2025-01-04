@@ -2,6 +2,7 @@ import os
 import torch
 from torch.utils.data import Dataset, DataLoader
 import tifffile as tiff
+import numpy as np
 
 class CellDataLoader(Dataset):
     def __init__(self, root_dir, data_list):
@@ -12,5 +13,5 @@ class CellDataLoader(Dataset):
         return len(self.data_list)
 
     def __getitem__(self, index):
-        image = tiff.imread(os.path.join(self.root_dir, self.data_list[index]))
+        image = tiff.imread(os.path.join(self.root_dir, self.data_list[index])).astype(np.int32)
         return image

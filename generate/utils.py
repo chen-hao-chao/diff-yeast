@@ -1,6 +1,6 @@
 import numpy as np
 from skimage.metrics import structural_similarity
-# from cellpose import utils
+from cellpose import utils
 import cv2
 import imutils
 from PIL import Image
@@ -201,13 +201,14 @@ def interpolate_idx(gif, tf_id, model, idx):
     for i in range(len(shift)):
         tf_id[i] = tf_id[i] + shift[i]
     return new_gif, tf_id
-
+import pdb
 import scipy.misc
 from skimage.draw import line_aa
 def add_outline(img, mask, channels=3):
     # img: 64x64x3 or 1
     # mask: 64x64
     # return: 64x64x3 or 1
+    # pdb.set_trace()
     outlines = utils.outlines_list(mask)
     for o in outlines:
         for i in range(o.shape[0]):
@@ -253,18 +254,35 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(0,int(len(gif)//6*2))])
     gif, tf_id = interpolate(gif, tf_id, model)
     gif, tf_id = interpolate(gif, tf_id, model)
+    gif, tf_id = interpolate(gif, tf_id, model)
+    gif, tf_id = interpolate(gif, tf_id, model)
+    gif, tf_id = interpolate(gif, tf_id, model)
+
     # for j in range(len(tf_id)):
     #     tf_id[j] = tf_id[j] - int(len(gif)//4)
     # gif = gif[len(gif)//4:]
     # gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
     # gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
-    gif, tf_id = interpolate(gif, tf_id, model)
-    gif, tf_id = interpolate(gif, tf_id, model)
-    gif, tf_id = interpolate(gif, tf_id, model)
-    for i in range(50):
-        gif.append(gif[-1])
-        tf_id.append(len(gif))
+
+    # for i in range(50):
+    #     gif.append(gif[-1])
+    #     tf_id.append(len(gif))
     print("Length: ", len(gif), len(tf_id))
+
+    masks = []
+    for i in range(len(gif)):
+        mask0 = np.zeros(gif[i][:,:,0].shape)
+        mask0[gif[i][:,:,0] != 0] = 1
+        mask1 = np.zeros(gif[i][:,:,1].shape)
+        mask1[gif[i][:,:,1] != 0] = 1
+        mask2 = np.zeros(gif[i][:,:,2].shape)
+        mask2[gif[i][:,:,2] != 0] = 1
+        masks.append(aggregate_masks(mask0, mask1, mask2))
+
+    # new_gif = []
+    # for i in range(len(gif)):
+    #     lined_img = add_outline(gif[i], masks[i], channels=3)
+    #     new_gif.append(lined_img)
 
     media.show_video(gif, fps=100, title=filename, codec='gif', border=True)
     np.savetxt(filename+'.txt', tf_id, fmt='%d')

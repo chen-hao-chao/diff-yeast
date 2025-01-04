@@ -47,9 +47,9 @@ def main(cfg : DictConfig) -> None:
     ORF = args.ORF
     bs = args.bs
     exam_bs = args.exam_bs
-    split_stage = args.split_stage
     mode = 'default' #'structure' #'default'
     avg = 0.125 #0.2 #0.125
+    num = 5
     set_deterministic(0)
 
     target_dir = './test_fig' #'/datasets/yeast-imgs/gt_videos/R1'
@@ -70,8 +70,6 @@ def main(cfg : DictConfig) -> None:
         imgs_channel_no_gfp_0 = imgs[:,0,:,:].numpy()
         imgs_channel_no_gfp_0 = imgs_channel_no_gfp_0
         mean_value = np.mean(imgs_channel_no_gfp_0[imgs_channel_no_gfp_0 != 0])
-        # mean_value = np.median(imgs_channel_no_gfp_0[imgs_channel_no_gfp_0 != 0])
-        # mean_value = np.max(imgs_channel_no_gfp_0[imgs_channel_no_gfp_0 != 0])
         print(mean_value)
         break
 
@@ -79,7 +77,6 @@ def main(cfg : DictConfig) -> None:
     root_dir='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/select_proteins/R1'
     
     df_list = []
-    df_no_gfp_list = []
     for i in range(6):
         print("Loading the ", str(i), "-th stage...")
         df = loaded_df[loaded_df['correctedMaxCycle_num'] == i]
@@ -87,7 +84,7 @@ def main(cfg : DictConfig) -> None:
         file = df[df.index.values.astype(int)[0]]
         df_list.append(file)
 
-    for rand_idx in range(5): #len(df_list[0])
+    for rand_idx in range(num): #len(df_list[0])
         # rand number
         rnd_0 = randrange(len(df_list[0]))
         rnd_1 = random.uniform(-1, 1)
@@ -191,8 +188,8 @@ def main(cfg : DictConfig) -> None:
                     img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
                     size = np.count_nonzero(aggregate_masks(mask_2, mask_1, mask_0))
-                    weight = [0.45,0.45,0.1] #[0.4,0.4,0.2]
-                    weight_iou = [0.0,1.0,0.0] #[0.0,0.0,1.0]
+                    weight = [0.45,0.45,0.1]
+                    weight_iou = [0.0,1.0,0.0]
                     score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
                                         mask_list_1=[mask_1, reference_mask_1[-1]],
                                         mask_list_0=[mask_0, reference_mask_0[-1]],

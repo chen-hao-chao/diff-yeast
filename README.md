@@ -5,3 +5,9 @@
 conda create --name diffy python=3.8
 conda activate diffy
 ```
+
+
+### UI
+```
+streamlit run test_ui_workable.py
+```

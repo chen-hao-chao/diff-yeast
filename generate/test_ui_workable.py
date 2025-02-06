@@ -39,9 +39,28 @@ def adjust_gif_colors(gif_path, brightness, red_intensity, green_intensity, blue
     byte_io.seek(0)
     return byte_io
 
+import requests
+def get_gene_description(gene_name):
+    """
+    Fetches the text description of a given yeast gene from the SGD API.
+
+    :param gene_name: The standard yeast gene name (e.g., 'CDC28')
+    :return: The gene description or an error message.
+    """
+    base_url = f"https://www.yeastgenome.org/backend/locus/{gene_name}"
+    response = requests.get(base_url)
+    if response.status_code == 200:
+        data = response.json()
+        description = data.get("description", "No description available")
+        return description
+    else:
+        return f"Error: Unable to fetch data for {gene_name}. Status code: {response.status_code}"
+
 # Root directories for GIFs
-ROOT_DIR_MAIN = './test_fig'
-ROOT_DIR_ALT = './test_fig_outlined'
+ROOT_DIR_MAIN = './ori_fig'
+ROOT_DIR_ALT = './ori_fig_outlined'
+ROOT_DIR_MAIN_REVERSE = './test_fig'
+ROOT_DIR_ALT_REVERSE = './test_fig_outlined'
 
 # Collect all GIF files in both directories
 def get_gif_files(root_dir):
@@ -54,19 +73,23 @@ def get_gif_files(root_dir):
 
 main_gif_files = get_gif_files(ROOT_DIR_MAIN)
 alt_gif_files = get_gif_files(ROOT_DIR_ALT)
+main_reverse_gif_files = get_gif_files(ROOT_DIR_MAIN_REVERSE)
+alt_reverse_gif_files = get_gif_files(ROOT_DIR_ALT_REVERSE)
 
 # Toggle folder selection
 use_alt_folder = st.sidebar.checkbox("Add Outlines")
-gif_files = alt_gif_files if use_alt_folder else main_gif_files
-gif_options = {gif.split('/')[-2] + '/' + gif.split('/')[-1].split('.')[0]: gif for gif in gif_files}
+use_reverse_folder = st.sidebar.checkbox("Reverse")
+
+if use_reverse_folder:
+    gif_files = alt_reverse_gif_files if use_alt_folder else main_reverse_gif_files
+else:
+    gif_files = alt_gif_files if use_alt_folder else main_gif_files
+gif_options = {gif.split('/')[-2] + ' -  Variant: ' + str(int(gif.split('/')[-1].split('.')[0].split('_')[0])+1): gif for gif in gif_files}
 
 # Checkbox to stop at a specific frame
 stop_at_frame = st.sidebar.checkbox("Stop at a specific frame")
-stop_frame = st.sidebar.number_input("Frame to stop at (0-192)", min_value=0, step=1) if stop_at_frame else None
+stop_frame = st.sidebar.number_input("Frame to stop at (0-192)", min_value=0, max_value=192, step=1) if stop_at_frame else None
 
-
-# Streamlit app title
-st.title("GIF Parameter Slider")
 
 # Sidebar for selecting a GIF
 st.sidebar.header("Select a GIF")
@@ -79,11 +102,18 @@ red_intensity = st.sidebar.slider("Red Intensity (Nucleus)", 0.0, 3.0, 1.0, 0.1)
 green_intensity = st.sidebar.slider("Green Intensity (Structure)", 0.0, 3.0, 1.0, 0.1)
 blue_intensity = 1 #st.sidebar.slider("Blue Intensity", 0.0, 3.0, 1.0, 0.1)
 
-
 # Display selected GIF
 if selected_gif_name:
+    # Streamlit app title
+    st.title(selected_gif_name)
     gif_path = gif_options[selected_gif_name]
+    gene_name = selected_gif_name.split(' ')[0]
+    description = get_gene_description(gene_name)
+    # print(f"Description of {gene_name}: {description}")
+
+    # Display description
+    st.write(f"**Description:** {description}")
     adjusted_gif = adjust_gif_colors(gif_path, brightness, red_intensity, green_intensity, blue_intensity, stop_frame=stop_frame)
 
     # Display GIF
-    st.image(adjusted_gif, caption=f"{selected_gif_name}", use_column_width=True)
+    st.image(adjusted_gif, caption=f"{selected_gif_name}", use_container_width=True)

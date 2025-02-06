@@ -231,7 +231,8 @@ def aggregate_masks(mask1, mask2, mask3):
 
 def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                  reference_img_2, reference_img_1, reference_img_0, 
-                 filename, rotate_angle=0, flip_img=False, apply_mask=True, mode='default'):
+                 filename, rotate_angle=0, flip_img=False, apply_mask=True, 
+                 mode='default', reverse_playing=False):
     set_show_save_dir('./')
     model = hub.load("https://tfhub.dev/google/film/1")
     _UINT8_MAX_F = float(np.iinfo(np.uint8).max)
@@ -284,8 +285,12 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     #     lined_img = add_outline(gif[i], masks[i], channels=3)
     #     new_gif.append(lined_img)
 
-    media.show_video(gif, fps=100, title=filename, codec='gif', border=True)
-    np.savetxt(filename+'.txt', tf_id, fmt='%d')
+    if reverse_playing:
+        media.show_video(gif[::-1], fps=100, title=filename, codec='gif', border=True)
+        np.savetxt(filename+'.txt', tf_id[::-1], fmt='%d')
+    else:
+        media.show_video(gif, fps=100, title=filename, codec='gif', border=True)
+        np.savetxt(filename+'.txt', tf_id, fmt='%d')
 
 def stack_imgs(img1, img2, img3):
     # output: 3x64x64

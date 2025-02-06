@@ -1,19 +1,25 @@
 import streamlit as st
-from PIL import Image, ImageEnhance, ImageOps, ImageFilter
+from PIL import Image, ImageEnhance
 import io
 import os
-from utils import add_outline, pseudo_segmentation
 import numpy as np
-import imageio.v3 as iio
+import requests
 
-# Function to adjust color channels of a GIF and optionally add an outline
-def adjust_gif_colors_and_outline(gif_path, brightness, red_intensity, green_intensity, blue_intensity, add_outline_):
+# Function to process GIF and synchronize Red & Green GIFs
+def process_gif(gif_path, brightness, red_intensity, green_intensity, blue_intensity, 
+                red_min_val, red_max_val, green_min_val, green_max_val, stop_frame=None, split_channels=False):
     gif = Image.open(gif_path)
     frames = []
-    new_gif = []
+    red_frames = []
+    green_frames = []
+    combined_frames = []
 
-    # Process each frame
-    for frame in range(0, gif.n_frames):
+    for frame in range(gif.n_frames):
+        if stop_frame is not None and frame > stop_frame:
+            break
+        elif stop_frame is not None and frame < stop_frame:
+            continue
+
         gif.seek(frame)
         frame_image = gif.convert("RGB")
 
@@ -28,72 +34,167 @@ def adjust_gif_colors_and_outline(gif_path, brightness, red_intensity, green_int
         b = b.point(lambda i: i * blue_intensity)
         adjusted_frame = Image.merge("RGB", (r, g, b))
 
-        # Add outline if checkbox is checked
-        adjusted_frame_np = np.array(adjusted_frame)
-        print(adjusted_frame_np.shape)
-        img = adjusted_frame_np[:,:,0]+adjusted_frame_np[:,:,1]+adjusted_frame_np[:,:,2] // 3
-        new_gif.append(np.clip((img - (np.max(img)//30)), a_min=0, a_max=255))
-        # if add_outline:
-            # adjusted_frame = adjusted_frame.filter(ImageFilter.FIND_EDGES)
+        # Convert to NumPy for contrast adjustment
+        frame_np = np.array(adjusted_frame, dtype=np.float32)
 
-        frames.append(adjusted_frame)
+        # ImageJ-style contrast adjustment for Red and Green channels
+        def adjust_contrast(channel, min_val, max_val):
+            channel = np.clip(channel, min_val, max_val)  # Clip values within range
+            channel = 255 * (channel - min_val) / (max_val - min_val + 1e-8)  # Normalize and scale to 0-255
+            return np.clip(channel, 0, 255)  # Ensure values remain in [0,255]
 
-    
-    if add_outline_:
-        masks, _ = pseudo_segmentation(new_gif)
-        new_gif = []
-        for i in range(0, gif.n_frames):
-            new_frame = add_outline(np.array(frames[i]), masks[i], channels=3)
-            new_gif.append(Image.fromarray(np.uint8(new_frame)))
-        byte_io = io.BytesIO()
-        new_gif[0].save(byte_io, format="GIF", save_all=True, append_images=new_gif[1:], loop=0)
-        byte_io.seek(0)
+        frame_np[:, :, 0] = adjust_contrast(frame_np[:, :, 0], red_min_val, red_max_val)  # Red
+        frame_np[:, :, 1] = adjust_contrast(frame_np[:, :, 1], green_min_val, green_max_val)  # Green
+
+        # Convert back to uint8
+        frame_np = frame_np.astype(np.uint8)
+
+        if split_channels:
+            # Create Red-only frame (Zero out Green & Blue)
+            red_only_frame = frame_np.copy()
+            red_only_frame[:, :, 1] = 0  # Remove Green
+            red_only_frame[:, :, 2] = 0  # Remove Blue
+            red_image = Image.fromarray(red_only_frame)
+
+            # Create Green-only frame (Zero out Red & Blue)
+            green_only_frame = frame_np.copy()
+            green_only_frame[:, :, 0] = 0  # Remove Red
+            green_only_frame[:, :, 2] = 0  # Remove Blue
+            green_image = Image.fromarray(green_only_frame)
+
+            # Resize both to 2x size
+            red_image = red_image.resize((adjusted_frame.width * 2, adjusted_frame.height * 2))
+            green_image = green_image.resize((adjusted_frame.width * 2, adjusted_frame.height * 2))
+
+            # Combine Red and Green side-by-side into one image for synchronized playback
+            combined_width = red_image.width + green_image.width
+            combined_height = red_image.height
+            combined_image = Image.new("RGB", (combined_width, combined_height))
+            combined_image.paste(red_image, (0, 0))
+            combined_image.paste(green_image, (red_image.width, 0))
+
+            combined_frames.append(combined_image)
+
+        else:
+            frames.append(Image.fromarray(frame_np))
+
+    if split_channels:
+        # Save Combined Red-Green GIF for Synchronized Playback
+        combined_gif_io = io.BytesIO()
+        combined_frames[0].save(combined_gif_io, format="GIF", save_all=True, append_images=combined_frames[1:], loop=0)
+        combined_gif_io.seek(0)
+
+        return combined_gif_io
     else:
-        byte_io = io.BytesIO()
-        frames[0].save(byte_io, format="GIF", save_all=True, append_images=frames[1:], loop=0)
-        byte_io.seek(0)
+        # Save Original Processed GIF
+        gif_io = io.BytesIO()
+        frames[0].save(gif_io, format="GIF", save_all=True, append_images=frames[1:], loop=0)
+        gif_io.seek(0)
+
+        return gif_io
+
+def get_gene_description(gene_name):
+    """
+    Fetches the text description of a given yeast gene from the SGD API.
+
+    :param gene_name: The standard yeast gene name (e.g., 'CDC28')
+    :return: The gene description or an error message.
+    """
+    base_url = f"https://www.yeastgenome.org/backend/locus/{gene_name}"
+    response = requests.get(base_url)
+    if response.status_code == 200:
+        data = response.json()
+        description = data.get("description", "No description available")
+        return description
+    else:
+        return f"Error: Unable to fetch data for {gene_name}. Status code: {response.status_code}"
+
+
+# Sidebar settings
+st.sidebar.header("Display Options")
+
+# Checkbox for choosing display mode (moved to the top)
+display_split_gif = st.sidebar.checkbox("Side-by-side Display")
+
+# Root directories for GIFs
+ROOT_DIR_MAIN = './ori_fig'
+ROOT_DIR_ALT = './ori_fig_outlined'
+ROOT_DIR_MAIN_REVERSE = './test_fig'
+ROOT_DIR_ALT_REVERSE = './test_fig_outlined'
+
+# Collect GIF files
+def get_gif_files(root_dir):
+    gif_files = []
+    for root, _, files in os.walk(root_dir):
+        for file in files:
+            if file.endswith('.gif'):
+                gif_files.append(os.path.join(root, file))
+    return gif_files
+
+main_gif_files = get_gif_files(ROOT_DIR_MAIN)
+alt_gif_files = get_gif_files(ROOT_DIR_ALT)
+main_reverse_gif_files = get_gif_files(ROOT_DIR_MAIN_REVERSE)
+alt_reverse_gif_files = get_gif_files(ROOT_DIR_ALT_REVERSE)
+
+# Sidebar toggles
+use_alt_folder = st.sidebar.checkbox("Add Outlines")
+use_reverse_folder = st.sidebar.checkbox("Reverse")
+
+# gif_files = alt_gif_files if use_alt_folder else main_gif_files
+if use_reverse_folder:
+    gif_files = alt_reverse_gif_files if use_alt_folder else main_reverse_gif_files
+else:
+    gif_files = alt_gif_files if use_alt_folder else main_gif_files
     
-    return byte_io
+gif_options = {
+    os.path.basename(os.path.dirname(gif)) + ' - Variant: ' + str(int(os.path.basename(gif).split('_')[0]) + 1): gif
+    for gif in gif_files
+}
 
-# Root directory for GIFs
-ROOT_DIR = './test_fig/' #'/scratch/ssd004/scratch/chchao/data/gt_videos/' #
+# Stop at frame option
+stop_at_frame = st.sidebar.checkbox("Stop at a specific frame")
+stop_frame = st.sidebar.number_input("Frame to stop at (0-192)", min_value=0, max_value=192, step=1) if stop_at_frame else None
 
-# Collect all GIF files in the directory and its subdirectories
-gif_files = []
-for root, _, files in os.walk(ROOT_DIR):
-    for file in files:
-        if file.endswith('.gif'):
-            gif_files.append(os.path.join(root, file))
-
-gif_options = {os.path.basename(gif): gif for gif in gif_files}
-
-# Streamlit app title
-st.title("GIF Parameter Slider")
-
-# Sidebar for selecting a GIF
+# Sidebar for GIF selection
 st.sidebar.header("Select a GIF")
 selected_gif_name = st.sidebar.radio("Choose a GIF", list(gif_options.keys()))
 
-# Sliders for adjusting parameters
+# Sliders for adjustments
 st.sidebar.header("Adjust Parameters")
-brightness = 1 #st.sidebar.slider("Brightness", 0.1, 3.0, 1.0, 0.1)
+brightness = 1  # Default, currently not user-controlled
 red_intensity = st.sidebar.slider("Red Intensity (Nucleus)", 0.0, 3.0, 1.0, 0.1)
 green_intensity = st.sidebar.slider("Green Intensity (Structure)", 0.0, 3.0, 1.0, 0.1)
-blue_intensity = 1 #st.sidebar.slider("Blue Intensity", 0.0, 3.0, 1.0, 0.1)
+blue_intensity = 1  # Default, currently not user-controlled
 
-# Checkbox for adding outline
-add_outline_ = st.sidebar.checkbox("Add Outline")
+# Contrast sliders for Red and Green channels
+st.sidebar.header("Adjust Contrast")
+st.sidebar.subheader("Red Channel")
+red_min_val = st.sidebar.slider("Red Min Pixel Value", 0, 255, 0, 1)
+red_max_val = st.sidebar.slider("Red Max Pixel Value", 0, 255, 255, 1)
+
+st.sidebar.subheader("Green Channel")
+green_min_val = st.sidebar.slider("Green Min Pixel Value", 0, 255, 0, 1)
+green_max_val = st.sidebar.slider("Green Max Pixel Value", 0, 255, 255, 1)
 
 # Display selected GIF
 if selected_gif_name:
+    st.title(selected_gif_name)
     gif_path = gif_options[selected_gif_name]
-    adjusted_gif = adjust_gif_colors_and_outline(gif_path, brightness, red_intensity, green_intensity, blue_intensity, add_outline_)
+    gene_name = selected_gif_name.split(' ')[0]
+    description = get_gene_description(gene_name)
+    st.write(f"**Description:** {description}")
 
-    # Button to stop GIF playing
-    stop_gif = st.sidebar.button("Stop GIF")
+    if display_split_gif:
+        combined_gif = process_gif(
+            gif_path, brightness, red_intensity, green_intensity, blue_intensity, 
+            red_min_val, red_max_val, green_min_val, green_max_val, stop_frame, split_channels=True
+        )
 
-    # Display GIF or a placeholder if stopped
-    if stop_gif:
-        st.image([], caption="GIF Stopped", use_column_width=True)
+        st.image(combined_gif.getvalue(), caption="Synchronized Red & Green GIF", use_container_width=True)
     else:
-        st.image(adjusted_gif, caption=f"Adjusted {selected_gif_name}", use_column_width=True)
+        # Show the original adjusted GIF
+        processed_gif = process_gif(
+            gif_path, brightness, red_intensity, green_intensity, blue_intensity, 
+            red_min_val, red_max_val, green_min_val, green_max_val, stop_frame, split_channels=False
+        )
+        st.image(processed_gif.getvalue(), caption=f"{selected_gif_name}", use_container_width=False, width=500)

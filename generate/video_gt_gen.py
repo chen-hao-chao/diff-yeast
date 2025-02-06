@@ -50,6 +50,7 @@ def main(cfg : DictConfig) -> None:
     mode = 'default' #'structure' #'default'
     avg = 0.125 #0.2 #0.125
     num = 5
+    reverse_playing = True
     set_deterministic(0)
 
     target_dir = './test_fig' #'/datasets/yeast-imgs/gt_videos/R1'
@@ -84,13 +85,13 @@ def main(cfg : DictConfig) -> None:
         file = df[df.index.values.astype(int)[0]]
         df_list.append(file)
 
-    for rand_idx in range(num): #len(df_list[0])
+    for rand_idx in range(num):
         # rand number
-        rnd_0 = randrange(len(df_list[0]))
+        rnd_0 = randrange(len(df_list[5])) if reverse_playing else randrange(len(df_list[0]))
         rnd_1 = random.uniform(-1, 1)
         rnd_2 = 0 #random.uniform(-1, 1)
         rnd_3 = random.uniform(-1, 1)
-        rnd_4 = randrange(7) # -> 3
+        rnd_4 = randrange(3) if reverse_playing else randrange(7) # -> 3
 
         img_idx = rnd_0
         balance_fac = args.balance_fac + rnd_1 * 0.2
@@ -113,12 +114,13 @@ def main(cfg : DictConfig) -> None:
         reference_img_1 = []
         reference_img_0 = []
 
-        for i in range(6): 
+        traverse_list = [5,4,3,2,1,0] if reverse_playing else [0,1,2,3,4,5]
+        for i in traverse_list: 
             print("Calculating the ", str(i), "-th stage...")
             all_choices = df_list[i]
             dataset = CellDataLoader(root_dir=root_dir, data_list=all_choices)
             data_loader = DataLoader(dataset, batch_size=bs, shuffle=False)
-            if i == 0:
+            if (i == 5 and reverse_playing) or (i == 0 and not reverse_playing):
                 imgs_channel_2 = None
                 imgs_channel_1 = None
                 imgs_channel_0 = None
@@ -232,7 +234,8 @@ def main(cfg : DictConfig) -> None:
         generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                     reference_img_2, reference_img_1, reference_img_0, 
                     filename=os.path.join(target_path, str(rand_idx)+'_'+mode),
-                    rotate_angle=angle, flip_img=flip, apply_mask=True, mode=mode)
+                    rotate_angle=angle, flip_img=flip, apply_mask=True, mode=mode,
+                    reverse_playing=reverse_playing)
         print("Successfully generate: ", os.path.join(target_path, str(rand_idx)))
 
 if __name__ == '__main__':

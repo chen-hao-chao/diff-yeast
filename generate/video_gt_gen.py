@@ -50,7 +50,10 @@ def main(cfg : DictConfig) -> None:
     mode = 'default' #'structure' #'default'
     avg = 0.125 #0.2 #0.125
     num = 5
-    reverse_playing = True
+    weight = [0.45,0.45,0.1]
+    weight_iou = [0.0,0.5,0.5] # [0.0,0.5,0.5] for both structure and nucleus
+    reverse_playing = False
+    # random_selection = True
     set_deterministic(0)
 
     target_dir = './test_fig' #'/datasets/yeast-imgs/gt_videos/R1'
@@ -190,8 +193,7 @@ def main(cfg : DictConfig) -> None:
                     img_2, img_1, img_0, mask_2, mask_1, mask_0 = rotate_to_normalize(img_2, img_1, img_0, mask_2, mask_1, mask_0)
 
                     size = np.count_nonzero(aggregate_masks(mask_2, mask_1, mask_0))
-                    weight = [0.45,0.45,0.1]
-                    weight_iou = [0.0,1.0,0.0]
+                    # score = np.random.rand()
                     score = score_compute(mask_list_2=[mask_2, reference_mask_2[-1]],
                                         mask_list_1=[mask_1, reference_mask_1[-1]],
                                         mask_list_0=[mask_0, reference_mask_0[-1]],

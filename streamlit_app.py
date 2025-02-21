@@ -11,10 +11,10 @@ import streamlit.components.v1 as components
 # Helper Functions for File Handling#
 #####################################
 
-def get_subfolder_names(parent_dir):
+def get_subfolder_names(base_dir):
     """Return a list of full paths to subfolders within parent_dir."""
     try:
-        subfolders = [entry.path for entry in os.scandir(parent_dir) if entry.is_dir()]
+        subfolders = [entry.path for entry in os.scandir(base_dir) if entry.is_dir()]
         return subfolders
     except Exception as e:
         return []
@@ -23,9 +23,11 @@ def get_gif_files(directory):
     """Return a list of GIF file paths from the given directory (including subdirectories)."""
     gif_files = []
     for root, _, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.gif'):
-                gif_files.append(os.path.join(root, file))
+        for i in range(5):
+            gif_files.append(os.path.join(root, str(i)+'_default.gif'))
+        # for file in files:
+        #     if file.endswith('.gif'):
+        #         gif_files.append(os.path.join(root, file))
     return gif_files
 
 #####################################
@@ -173,8 +175,8 @@ def get_base_folder(gen_method, use_outline=False):
 st.sidebar.header("Display Mode")
 display_mode = st.sidebar.radio("Choose Display Mode", ["Single Image", "Multiple Images"])
 
-st.sidebar.header("Generation Methods")
 if display_mode == "Single Image":
+    st.sidebar.header("Generation Methods")
     use_method = st.sidebar.radio("Choose a generation method", 
                                   ["forward selection", "reverse selection", "+structure", "random"])
 
@@ -246,12 +248,10 @@ if display_mode == "Single Image":
             gene_name = selected_gif_name.split(' ')[0]
             description = get_gene_description(gene_name)
             st.write(f"**Description:** {description}")
-            
-            effective_stop_frame = stop_frame
-            
+                        
             processed = process_gif(
                 gif_path, brightness, contrast, red_intensity, green_intensity, blue_intensity,
-                red_min_val, red_max_val, green_min_val, green_max_val, effective_stop_frame,
+                red_min_val, red_max_val, green_min_val, green_max_val, stop_frame,
                 split_channels=display_split_gif, frame_duration=gif_speed
             )
             st.image(processed.getvalue(), caption=selected_gif_name, width=500)
@@ -263,9 +263,6 @@ if display_mode == "Single Image":
 else:
     st.title("Multiple Images Display")
 
-    # Sidebar: For each generation method, let the user select a subfolder.
-    st.sidebar.header("Subfolder Selection for Multiple Images")
-    
     method_info = {
         "Forward": "forward selection",
         "Reverse": "reverse selection",
@@ -273,15 +270,33 @@ else:
         "Random": "random"
     }
     selected_folders = {}
+    st.sidebar.header("Settings")
+    sync_selection = st.sidebar.checkbox("Apply selection to all methods", value=True)
+    # Fetch all available subfolders for each method
+    all_subfolders = {}
     for label, method in method_info.items():
         base_dir = get_base_folder(method, use_alt_folder)
         subfolders = get_subfolder_names(base_dir)
-        if subfolders:
-            subfolder_names = [os.path.basename(sf) for sf in subfolders]
-            selected_name = st.sidebar.selectbox(f"{label} Subfolder", subfolder_names, key=label)
-            selected_folder = [sf for sf in subfolders if os.path.basename(sf)==selected_name][0]
+        subfolder_names = [os.path.basename(sf) for sf in subfolders] if subfolders else []
+        all_subfolders[label] = subfolder_names
+
+    # Determine the first non-empty subfolder list for synchronization
+    first_subfolder_list = next(iter(all_subfolders.values()), [])
+    selected_name = None
+
+    if sync_selection and first_subfolder_list:
+        selected_name = st.sidebar.selectbox("Select Subfolder", first_subfolder_list, key="global_select")
+
+    # Display dropdowns for each method
+    for label, method in method_info.items():
+        subfolder_names = all_subfolders[label]
+
+        if sync_selection:
+            selected_folder = os.path.join(get_base_folder(method, use_alt_folder), selected_name) if selected_name else None
         else:
-            selected_folder = base_dir
+            selected_name = st.sidebar.selectbox(f"{label}", subfolder_names, key=label)
+            selected_folder = os.path.join(get_base_folder(method, use_alt_folder), selected_name) if selected_name else None
+
         selected_folders[label] = selected_folder
 
     # Build one combined HTML gallery.
@@ -347,25 +362,24 @@ else:
             if display_split_gif:
                 processed = process_gif(
                     gif_path, brightness, contrast, red_intensity, green_intensity, blue_intensity,
-                    red_min_val, red_max_val, green_min_val, green_max_val, None,
+                    red_min_val, red_max_val, green_min_val, green_max_val, stop_frame,
                     split_channels=True, frame_duration=gif_speed
                 )
             else:
                 processed = process_gif(
                     gif_path, brightness, contrast, red_intensity, green_intensity, blue_intensity,
-                    red_min_val, red_max_val, green_min_val, green_max_val, None,
+                    red_min_val, red_max_val, green_min_val, green_max_val, stop_frame,
                     split_channels=False, frame_duration=gif_speed
                 )
             b64 = base64.b64encode(processed.getvalue()).decode("utf-8")
             gallery_html += f"""
                 <div class='gallery-item'>
                   <img class='sync-gif' src="data:image/gif;base64,{b64}" />
-                  <p>{os.path.basename(gif_path)}</p>
+                  <p>{"Varaint: "+os.path.basename(gif_path).split('_')[0]}</p>
                 </div>
             """
         gallery_html += "</div>"
     gallery_html += """
-        <button onclick="restartGifs()">Restart Animations</button>
       </body>
     </html>
     """

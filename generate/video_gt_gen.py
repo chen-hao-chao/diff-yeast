@@ -50,8 +50,8 @@ def main(cfg : DictConfig) -> None:
     mode = 'default' #'structure' #'default'
     avg = 0.125 #0.2 #0.125
     num = 5
-    weight = [0.45,0.45,0.1]
-    weight_iou = [0.0,0.5,0.5] # [0.0,0.5,0.5] for both structure and nucleus
+    weight = [0.0,0.9,0.1] #[0.45,0.45,0.1]
+    weight_iou = [0.0,0.0,1.0] # [0.0,0.5,0.5] for both structure and nucleus
     reverse_playing = False
     # random_selection = True
     set_deterministic(0)

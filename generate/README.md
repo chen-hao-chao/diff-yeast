@@ -11,10 +11,15 @@ pip install scikit-learn
 pip install openpyxl
 ```
 
+# Time
+- selection: 31 s
+- interpolation: 75 s
+
 ### Generate Video Examples
 - (Testing) Generate a GIF with a specific structure:
 ```
 python video_gt_gen.py config=test/test_1.yaml
+python video_gt_gen_ray.py config=default.yaml
 ```
 
 - Video ground truth generation
@@ -35,4 +40,21 @@ python refine_add_tfid.py
 - ISSUE: cannot use A40 GPUs.
 ```
 RuntimeError: Program 'ffmpeg' is not found; perhaps install ffmpeg using 'apt install ffmpeg'.
+```
+
+### Ray Generation
+
+- Check the Resources
+```
+nproc --all
+```
+
+- CPU nodes
+```
+srun -p cpu -q cpu_qos -c 16 --nodes=1 --time 04:00:00 --pty bash
+```
+
+- Generation code
+```
+python video_gt_gen_ray.py config=default.yaml
 ```

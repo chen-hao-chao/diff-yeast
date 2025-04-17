@@ -6,6 +6,14 @@ import imutils
 from PIL import Image
 import os
 
+import pdb
+import scipy.misc
+from skimage.draw import line_aa
+import scipy as sp
+
+from scipy import stats as scistats
+from sklearn import decomposition as skdecomp
+
 def pseudo_segmentation(img_list):
     masks = []
     for i in range(len(img_list)):
@@ -28,7 +36,6 @@ def normalize_intensity(img, avg=0.2):
     return (img * 255).astype(np.uint8)
 
 # Source: https://stackoverflow.com/questions/33548639/how-can-i-smooth-elements-of-a-two-dimensional-array-with-differing-gaussian-fun
-import scipy as sp
 def smooth_mask(mask, sigma=1):
     mask = sp.ndimage.filters.gaussian_filter(mask, sigma, mode='constant')
     return mask
@@ -69,8 +76,7 @@ def iou_compute(outputs: np.array, labels: np.array):
     iou = (intersection + SMOOTH) / (union + SMOOTH)
     return iou
 
-from scipy import stats as scistats
-from sklearn import decomposition as skdecomp
+
 def angle_compute(mask):
     y, x = np.where(mask)
     xy = np.hstack([x.reshape(-1, 1), y.reshape(-1, 1)])
@@ -109,7 +115,7 @@ def similarity_compute(img_1: np.array, img_2: np.array):
     score = structural_similarity(img_1.squeeze()/255, img_2.squeeze()/255, data_range=1.0)
     return score
 
-def score_compute(mask_list_2, mask_list_1, mask_list_0, img_2_list, img_1_list, img_0_list, balance_fac=0.25, balance_fac_cat=0.1, weight=[0.4,0.4,0.2], weight_iou=[0.0,0.0,1.0]):
+def score_compute(mask_list_2, mask_list_1, mask_list_0, img_2_list, img_1_list, img_0_list, balance_fac=0.25, weight=[0.4,0.4,0.2], weight_iou=[0.0,0.0,1.0]):
     mask_2, ref_mask_2 = mask_list_2
     mask_1, ref_mask_1 = mask_list_1
     mask_0, ref_mask_0 = mask_list_0
@@ -124,11 +130,7 @@ def score_compute(mask_list_2, mask_list_1, mask_list_0, img_2_list, img_1_list,
     ssim_1 = similarity_compute( ref_img_1*ref_mask_1, img_1*mask_1 )*weight[1]
     ssim_0 = similarity_compute( ref_img_0*ref_mask_0, img_0*mask_0 )*weight[0]
 
-    category_ref = find_centres(ref_mask_2, ref_mask_1, ref_mask_0)
-    category = find_centres(mask_2, mask_1, mask_0)
-    category_score = -np.abs(category_ref - category)
-
-    score = (iou_2 + iou_1 + iou_0) + balance_fac * (ssim_2 + ssim_1 + ssim_0) + balance_fac_cat * category_score
+    score = (iou_2 + iou_1 + iou_0) + balance_fac * (ssim_2 + ssim_1 + ssim_0)
     return score
 
 def determine_center(seg, size=64):
@@ -167,7 +169,7 @@ def visualize(data, filename, mode='L'):
 
 def gen_frame(frame_1, frame_2, model):
     time = np.array([0.5], dtype=np.float32)
-    input_ = {'time': np.expand_dims(time, axis=0), 'x0': np.expand_dims(frame_1, axis=0),'x1': np.expand_dims(frame_2, axis=0)}
+    input_ = {'time': np.expand_dims(time, axis=0), 'x0': np.expand_dims(frame_1, axis=0), 'x1': np.expand_dims(frame_2, axis=0)}
     mid_frame = model(input_)
     return mid_frame['image'][0].numpy()
 
@@ -201,14 +203,11 @@ def interpolate_idx(gif, tf_id, model, idx):
     for i in range(len(shift)):
         tf_id[i] = tf_id[i] + shift[i]
     return new_gif, tf_id
-import pdb
-import scipy.misc
-from skimage.draw import line_aa
+
 def add_outline(img, mask, channels=3):
     # img: 64x64x3 or 1
     # mask: 64x64
     # return: 64x64x3 or 1
-    # pdb.set_trace()
     outlines = utils.outlines_list(mask)
     for o in outlines:
         for i in range(o.shape[0]):
@@ -229,9 +228,22 @@ def aggregate_masks(mask1, mask2, mask3):
     mask[mask != 0] = 1
     return mask
 
+def save_real_frames(gif, filename, mode='visualized'):
+    for i in range(len(gif)):
+        if mode == "visualized":
+            im = Image.fromarray(gif[i].astype(np.uint8))
+            im.save(filename + f"_real_frame_{i}.png")
+        else:
+            img_np = np.array(gif[i].astype(np.uint8))
+            most_common_value = np.bincount(img_np.flatten()).argmax()
+            img_np[img_np < most_common_value] = most_common_value
+            # save
+            im = Image.fromarray(img_np, 'L')
+            im.save(filename + f"_real_frame_{i}_{mode}.png")
+
 def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                  reference_img_2, reference_img_1, reference_img_0, 
-                 filename, rotate_angle=0, flip_img=False, apply_mask=True, 
+                 filepath, filename, rotate_angle=0, flip_img=False, apply_mask=True, 
                  mode='default', reverse_playing=False):
     set_show_save_dir('./')
     model = hub.load("https://tfhub.dev/google/film/1")
@@ -239,6 +251,7 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     
     gif = []
     tf_id = []
+    save_gif = []
     for i in range(len(reference_img_2)):
         reference_mask = aggregate_masks(reference_mask_2[i], reference_mask_1[i], reference_mask_0[i])
         merged_img = merge(reference_img_2[i], reference_img_1[i], reference_img_0[i], reference_mask, apply_mask=apply_mask, mode=mode).astype(np.uint8)
@@ -249,8 +262,14 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
         if rotate_angle != 0:
             merged_img = rotate(merged_img, angle=rotate_angle)
         
+        save_gif.append(merged_img)
         gif.append(merged_img.astype(np.float32) / _UINT8_MAX_F)
         tf_id.append(i)
+
+    save_real_frames(save_gif, os.path.join(filepath, 'real_frames', filename))
+    save_real_frames(reference_img_2, os.path.join(filepath, 'real_frames', filename), mode='base')
+    save_real_frames(reference_img_1, os.path.join(filepath, 'real_frames', filename), mode='nucleus')
+    save_real_frames(reference_img_0, os.path.join(filepath, 'real_frames', filename), mode='structure')
 
     gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(0,int(len(gif)//6*2))])
     gif, tf_id = interpolate(gif, tf_id, model)
@@ -286,11 +305,11 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     #     new_gif.append(lined_img)
 
     if reverse_playing:
-        media.show_video(gif[::-1], fps=100, title=filename, codec='gif', border=True)
-        np.savetxt(filename+'.txt', tf_id[::-1], fmt='%d')
+        media.show_video(gif[::-1], fps=100, title=os.path.join(filepath, filename), codec='gif', border=True)
+        np.savetxt(os.path.join(filepath, filename+'.txt'), tf_id[::-1], fmt='%d')
     else:
-        media.show_video(gif, fps=100, title=filename, codec='gif', border=True)
-        np.savetxt(filename+'.txt', tf_id, fmt='%d')
+        media.show_video(gif, fps=100, title=os.path.join(filepath, filename), codec='gif', border=True)
+        np.savetxt(os.path.join(filepath, filename+'.txt'), tf_id, fmt='%d')
 
 def stack_imgs(img1, img2, img3):
     # output: 3x64x64

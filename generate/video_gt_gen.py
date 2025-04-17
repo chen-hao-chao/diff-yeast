@@ -60,6 +60,10 @@ def main(cfg : DictConfig) -> None:
     method = args.method
     print("[method, ORF, bs, exam_bs] = [{}, {}, {}, {}]\n\n".format(method, ORF, bs, exam_bs))
 
+    # file specification
+    csv_path = '~/scratch/group_by_protein_stage_rep1_filename_dict.csv' #'/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv'
+    data_path = '~/scratch/R1' #'/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/all/R1'
+
     mode = 'default' #'structure' #'default'
     avg = 0.125
     num = 10
@@ -78,14 +82,14 @@ def main(cfg : DictConfig) -> None:
     
     set_deterministic(0)
     
-    target_dir = './test_fig'#'/projects/yeast-cell-diffusion/generated_videos' #'/datasets/yeast-imgs/gt_videos/R1'
+    target_dir = './test_fig' #'/projects/yeast-cell-diffusion/generated_videos' #'/datasets/yeast-imgs/gt_videos/R1'
     target_path = pathlib.Path(target_dir) #os.path.join(target_dir, ORF, method)
     target_subdir_path = target_path / ORF / method
     target_subdir_path.mkdir(parents=True, exist_ok=True)
 
     mean_value = 7.9098546791537325
-    loaded_df = pd.read_csv('/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv')
-    root_dir='/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/all/R1' #select_proteins
+    loaded_df = pd.read_csv(csv_path)
+    root_dir= data_path #select_proteins
     
     df_list = []
     for i in range(6):

@@ -9,6 +9,13 @@ pip install torchvision
 pip install imutils
 pip install scikit-learn
 pip install openpyxl
+pip install cellpose
+```
+
+- Load opencv before installing `cellpose`
+```
+module load gcc
+module load opencv/4.11.0
 ```
 
 # Time

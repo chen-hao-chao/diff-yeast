@@ -12,11 +12,6 @@ pip install openpyxl
 pip install cellpose
 ```
 
-- Load opencv before installing `cellpose`
-```
-module load gcc
-module load opencv/4.11.0
-```
 
 # Time
 - selection: 31 s
@@ -65,3 +60,7 @@ srun -p cpu -q cpu_qos -c 16 --nodes=1 --time 04:00:00 --pty bash
 ```
 python video_gt_gen_ray.py config=default.yaml
 ```
+
+# Bottleneck
+
+- incomplete `R1` folder (cannot unzip `R1.zip`). need more space.

@@ -61,9 +61,8 @@ def main(cfg : DictConfig) -> None:
     print("[method, ORF, bs, exam_bs] = [{}, {}, {}, {}]\n\n".format(method, ORF, bs, exam_bs))
 
     # file specification
-    csv_path = '~/scratch/group_by_protein_stage_rep1_filename_dict.csv' #'/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv'
-    data_path = '~/scratch/R1' #'/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/all/R1'
-
+    csv_path = '/home/chchao0/scratch/group_by_protein_stage_rep1_filename_dict.csv' #'/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv'
+    data_path = '/home/chchao0/projects/def-rahulgk/chchao0/R1' #'/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/all/R1'
     mode = 'default' #'structure' #'default'
     avg = 0.125
     num = 10
@@ -82,7 +81,7 @@ def main(cfg : DictConfig) -> None:
     
     set_deterministic(0)
     
-    target_dir = './test_fig' #'/projects/yeast-cell-diffusion/generated_videos' #'/datasets/yeast-imgs/gt_videos/R1'
+    target_dir = '/home/chchao0/diff-yeast/generate/test_fig' #'/projects/yeast-cell-diffusion/generated_videos' #'/datasets/yeast-imgs/gt_videos/R1'
     target_path = pathlib.Path(target_dir) #os.path.join(target_dir, ORF, method)
     target_subdir_path = target_path / ORF / method
     target_subdir_path.mkdir(parents=True, exist_ok=True)

@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 from dataloader import CellDataLoader
-from utils import generate_gif, rotate_to_normalize, flip_to_normalize, aggregate_masks
+from utils import rotate_to_normalize, flip_to_normalize, aggregate_masks
 from utils import score_compute, find_centres
 from utils import normalize_intensity, pseudo_segmentation, shift_intensity
 
@@ -56,8 +56,6 @@ def main(cfg : DictConfig) -> None:
     print("[method, ORF, bs, exam_bs] = [{}, {}, {}, {}]\n\n".format(method, ORF, bs, exam_bs))
 
     # file specification
-    # csv_path = '/home/chchao0/scratch/group_by_protein_stage_rep1_filename_dict.csv' #'/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv'
-    # data_path = '/home/chchao0/projects/def-rahulgk/chchao0/R1' #'/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/all/R1'
     csv_path = '/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv'
     data_path = '/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/all/R1'
     mode = 'default' #'structure' #'default'
@@ -78,9 +76,8 @@ def main(cfg : DictConfig) -> None:
     
     set_deterministic(0)
     
-    # target_dir = '/home/chchao0/diff-yeast/generate/test_fig' #'/projects/yeast-cell-diffusion/generated_videos' #'/datasets/yeast-imgs/gt_videos/R1'
     target_dir = '/h/chchao/diff-yeast/generate/test_fig'
-    target_path = pathlib.Path(target_dir) #os.path.join(target_dir, ORF, method)
+    target_path = pathlib.Path(target_dir)
     target_subdir_path = target_path / ORF / method
     target_subdir_path.mkdir(parents=True, exist_ok=True)
 
@@ -231,34 +228,29 @@ def main(cfg : DictConfig) -> None:
                                             weight_iou=weight_iou)
                     rank_list.append([size, score, mask_2, mask_1, mask_0, img_2, img_1, img_0])
 
-                rank_list = sorted(rank_list, key=lambda x: x[0])
-                splits = 1
-                num_frames = 1
-                rank_list_sorted_size = sorted(rank_list, key=lambda x: x[0])
-                for k in range(splits):
-                    rank_list_sorted = sorted(rank_list_sorted_size[k*(len(rank_list)//splits) : (k+1)*(len(rank_list)//splits)], key=lambda x: x[1], reverse=True)
-                    for n in range(num_frames):
-                        reference_mask_2.append(rank_list_sorted[rnk+n][2])
-                        reference_mask_1.append(rank_list_sorted[rnk+n][3])
-                        reference_mask_0.append(rank_list_sorted[rnk+n][4])
-                        reference_img_2.append(rank_list_sorted[rnk+n][5]) # 1x64x64 np array
-                        reference_img_1.append(rank_list_sorted[rnk+n][6]) # 1x64x64 np array
-                        reference_img_0.append(rank_list_sorted[rnk+n][7]) # 1x64x64 np array
+                rank_list_sorted = sorted(rank_list, key=lambda x: x[1], reverse=True)
+                app_idx = min(len(rank_list_sorted)-1, rnk)
+                reference_mask_2.append(rank_list_sorted[app_idx][2])
+                reference_mask_1.append(rank_list_sorted[app_idx][3])
+                reference_mask_0.append(rank_list_sorted[app_idx][4])
+                reference_img_2.append(rank_list_sorted[app_idx][5]) # 1x64x64 np array
+                reference_img_1.append(rank_list_sorted[app_idx][6]) # 1x64x64 np array
+                reference_img_0.append(rank_list_sorted[app_idx][7]) # 1x64x64 np array
         
         end = time.time()
         print("Time (Frame Matching): {}".format(end - start))
         start = time.time()
-
-        generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
-                    reference_img_2, reference_img_1, reference_img_0, 
-                    filepath=os.path.join(target_path, ORF, method, str(rand_idx)),
-                    filename=str(rand_idx) + '_video',
-                    rotate_angle=angle, flip_img=flip, apply_mask=True, mode=mode,
-                    reverse_playing=reverse_playing)
-
+        filepath = target_path / ORF / method / str(rand_idx) / "selected_files"
+        filepath.mkdir(parents=True, exist_ok=True)
+        np.save(filepath / 'reference_mask_2.npy', np.array(reference_mask_2), allow_pickle=True)
+        np.save(filepath / 'reference_mask_1.npy', np.array(reference_mask_1), allow_pickle=True)
+        np.save(filepath / 'reference_mask_0.npy', np.array(reference_mask_0), allow_pickle=True)
+        np.save(filepath / 'reference_img_2.npy', np.array(reference_img_2), allow_pickle=True)
+        np.save(filepath / 'reference_img_1.npy', np.array(reference_img_1), allow_pickle=True)
+        np.save(filepath / 'reference_img_0.npy', np.array(reference_img_0), allow_pickle=True)
         end = time.time()
         print("Successfully generate: {}".format(os.path.join(target_path, str(rand_idx))))
-        print("Time (Frame Interpolation): {}".format(end - start))
+        print("Time (Saving Time): {}".format(end - start))
 
 if __name__ == '__main__':
     main()

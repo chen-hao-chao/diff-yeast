@@ -2,17 +2,19 @@ import numpy as np
 from skimage.metrics import structural_similarity
 from cellpose import utils
 import cv2
-import imutils
 from PIL import Image
 import os
 
-import pdb
-import scipy.misc
 from skimage.draw import line_aa
 import scipy as sp
 
 from scipy import stats as scistats
 from sklearn import decomposition as skdecomp
+import time
+import torch
+from PIL import Image
+
+import pdb
 
 def pseudo_segmentation(img_list):
     masks = []
@@ -154,24 +156,38 @@ def determine_center(seg, size=64):
         shift_list.append([np.zeros((size,size)), 0])
     return shift_list
 
-import tensorflow as tf
-import tensorflow_hub as hub
-import requests
-from typing import Generator, Iterable, List, Optional
-import mediapy as media
-from mediapy import set_show_save_dir
-from PIL import Image
-
 def visualize(data, filename, mode='L'):
     # data should be within the range [0,255]
     img = Image.fromarray(np.uint8(data), mode)
     img.save(filename)
 
-def gen_frame(frame_1, frame_2, model):
-    time = np.array([0.5], dtype=np.float32)
-    input_ = {'time': np.expand_dims(time, axis=0), 'x0': np.expand_dims(frame_1, axis=0), 'x1': np.expand_dims(frame_2, axis=0)}
-    mid_frame = model(input_)
-    return mid_frame['image'][0].numpy()
+def gen_frame(frame_1, frame_2, model, 
+              precision=torch.float16, device=torch.device('cuda')):
+    frame_1 = torch.tensor(frame_1).to(precision).to(device)
+    frame_2 = torch.tensor(frame_2).to(precision).to(device)
+    time = frame_1.new_full((1, 1), .5)
+
+    width, height, channel = frame_1.shape
+    frame_1 = frame_1.view(1, width, height, channel).permute(0, 3, 1, 2)
+    frame_2 = frame_2.view(1, width, height, channel).permute(0, 3, 1, 2)
+    
+    mid_frame = model(frame_1, frame_2, time)
+    mid_frame = mid_frame.view(channel, width, height).permute(1, 2, 0)
+    return mid_frame.detach().cpu().numpy()
+
+def gen_frame_parallel(frame_1, frame_2, model, 
+              precision=torch.float16, device=torch.device('cuda')):
+    frame_1 = torch.tensor(frame_1).to(precision).to(device)
+    frame_2 = torch.tensor(frame_2).to(precision).to(device)
+    time = frame_1.new_full((frame_1.shape[0], 1), .5)
+
+    bs, width, height, channel = frame_1.shape
+    frame_1 = frame_1.view(bs, width, height, channel).permute(0, 3, 1, 2)
+    frame_2 = frame_2.view(bs, width, height, channel).permute(0, 3, 1, 2)
+    
+    mid_frame = model(frame_1, frame_2, time)
+    mid_frame = mid_frame.view(bs, channel, width, height).permute(0, 2, 3, 1)
+    return mid_frame.detach().cpu().numpy()
 
 def interpolate(gif, tf_id, model):
     new_gif = []
@@ -179,6 +195,24 @@ def interpolate(gif, tf_id, model):
     new_gif.append(gif[0])
     for i in range(1,len(gif)):
         new_frame = gen_frame(gif[i-1], gif[i], model)
+        new_gif.append(new_frame)
+        for k in range(len(tf_id)):
+            if tf_id[k] >= i:
+                shift[k] = shift[k] + 1
+        new_gif.append(gif[i])
+    for i in range(len(shift)):
+        tf_id[i] = tf_id[i] + shift[i]
+    return new_gif, tf_id
+
+def interpolate_parallel(gif, tf_id, model):
+    new_gif = []
+    shift = [0 for i in range(len(tf_id))]
+    frame_1s = np.array(gif[:-1])
+    frame_2s = np.array(gif[1:])
+    new_frames = gen_frame_parallel(frame_1s, frame_2s, model)
+    new_gif.append(gif[0])
+    for i in range(1,len(gif)):
+        new_frame = new_frames[i-1]
         new_gif.append(new_frame)
         for k in range(len(tf_id)):
             if tf_id[k] >= i:
@@ -203,6 +237,7 @@ def interpolate_idx(gif, tf_id, model, idx):
     for i in range(len(shift)):
         tf_id[i] = tf_id[i] + shift[i]
     return new_gif, tf_id
+
 
 def add_outline(img, mask, channels=3):
     # img: 64x64x3 or 1
@@ -244,9 +279,12 @@ def save_real_frames(gif, filename, mode='visualized'):
 def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0, 
                  reference_img_2, reference_img_1, reference_img_0, 
                  filepath, filename, rotate_angle=0, flip_img=False, apply_mask=True, 
-                 mode='default', reverse_playing=False):
-    set_show_save_dir('./')
-    model = hub.load("https://tfhub.dev/google/film/1")
+                 mode='default', reverse_playing=False, 
+                 model_path='h/chchao/film_net_fp16.pt'):
+    device = torch.device('cuda')
+    precision = torch.float16
+    model = torch.jit.load(model_path, map_location='cpu')
+    model.eval().to(device=device, dtype=precision)
     _UINT8_MAX_F = float(np.iinfo(np.uint8).max)
     
     gif = []
@@ -271,22 +309,15 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     save_real_frames(reference_img_1, os.path.join(filepath, 'real_frames', filename), mode='nucleus')
     save_real_frames(reference_img_0, os.path.join(filepath, 'real_frames', filename), mode='structure')
 
+    start = time.time()
     gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(0,int(len(gif)//6*2))])
-    gif, tf_id = interpolate(gif, tf_id, model)
-    gif, tf_id = interpolate(gif, tf_id, model)
-    gif, tf_id = interpolate(gif, tf_id, model)
-    gif, tf_id = interpolate(gif, tf_id, model)
-    gif, tf_id = interpolate(gif, tf_id, model)
-
-    # for j in range(len(tf_id)):
-    #     tf_id[j] = tf_id[j] - int(len(gif)//4)
-    # gif = gif[len(gif)//4:]
-    # gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
-    # gif, tf_id = interpolate_idx(gif, tf_id, model, [i for i in range(int(len(gif)//6*4), len(gif))])
-
-    # for i in range(50):
-    #     gif.append(gif[-1])
-    #     tf_id.append(len(gif))
+    gif, tf_id = interpolate_parallel(gif, tf_id, model)
+    gif, tf_id = interpolate_parallel(gif, tf_id, model)
+    gif, tf_id = interpolate_parallel(gif, tf_id, model)
+    gif, tf_id = interpolate_parallel(gif, tf_id, model)
+    gif, tf_id = interpolate_parallel(gif, tf_id, model)
+    end = time.time()
+    print("Time (Pure Interpolation): {}".format(end - start))
     print("Length: ", len(gif), len(tf_id))
 
     masks = []
@@ -304,11 +335,16 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
     #     lined_img = add_outline(gif[i], masks[i], channels=3)
     #     new_gif.append(lined_img)
 
+    gif_uint8 = [np.clip((frame * 255 if frame.max() <= 1 else frame), 0, 255).astype(np.uint8) for frame in gif]
     if reverse_playing:
-        media.show_video(gif[::-1], fps=100, title=os.path.join(filepath, filename), codec='gif', border=True)
+        frames = [Image.fromarray(frame) for frame in gif_uint8[::-1]]
+        frames[0].save(os.path.join(filepath, filename+'.gif'), save_all=True, append_images=frames[1:],
+                        duration=10, loop=0, optimize=True)
         np.savetxt(os.path.join(filepath, filename+'.txt'), tf_id[::-1], fmt='%d')
     else:
-        media.show_video(gif, fps=100, title=os.path.join(filepath, filename), codec='gif', border=True)
+        frames = [Image.fromarray(frame) for frame in gif_uint8]
+        frames[0].save(os.path.join(filepath, filename+'.gif'), save_all=True, append_images=frames[1:],
+                        duration=10, loop=0, optimize=True)
         np.savetxt(os.path.join(filepath, filename+'.txt'), tf_id, fmt='%d')
 
 def stack_imgs(img1, img2, img3):

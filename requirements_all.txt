@@ -91,11 +91,7 @@ stack-data==0.6.3
 sympy==1.13.2
 tensorboard==2.13.0
 tensorboard-data-server==0.7.2
-tensorflow-estimator==2.13.0
-tensorflow-hub==0.16.1
-tensorflow-io-gcs-filesystem==0.34.0
 termcolor==2.4.0
-tf-keras==2.15.0
 tifffile==2023.7.10
 tqdm==4.66.5
 traitlets==5.14.3

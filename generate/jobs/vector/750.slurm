@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=yeast_200
+#SBATCH --job-name=yeast_750
 #SBATCH --qos=cpu_qos
 #SBATCH --partition=cpu
 #SBATCH --nodes=1
@@ -18,6 +18,6 @@ source ~/.bashrc
 conda activate cellpose
 which python
 
-python video_gt_gen_ray2.py config=default.yaml
+python video_gt_gen_ray3.py config=default.yaml
 child="$!"
 wait "$child"

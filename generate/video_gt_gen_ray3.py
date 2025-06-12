@@ -24,16 +24,16 @@ def tuner(cfg : DictConfig):
     ORF_list = [df[df.index.values.astype(int)[i]] for i in range(len(df))]
 
     search_space = {
-        "ORF": tune.grid_search(ORF_list[100:200]),
-        "method": tune.grid_search(['nucleus', 'random']), #'structure', 
+        "ORF": tune.grid_search(ORF_list[500:750]),
+        "method": tune.grid_search(['nucleus', 'random', 'structure']),
     }
 
     wrapped_runner = lambda x: runner(x, cfg)
 
     analysis = tune.run(
         wrapped_runner, 
-        storage_path="/h/chchao/diff-yeast/results_ray",
-        resources_per_trial={'cpu': 4, 'gpu': 0},
+        storage_path="/h/chchao/diff-yeast/results_ray_3",
+        resources_per_trial={'cpu': 8, 'gpu': 0},
         config=search_space,
     )
 

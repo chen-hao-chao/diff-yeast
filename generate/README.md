@@ -1,5 +1,10 @@
 # Diffusion Model Generation for Yeast Cells -- Generate Videos
 
+### GPU Request
+```bash
+srun -p a40 -q normal -c 16 --gres=gpu:1 --time 04:00:00 --pty bash
+```
+
 ### Install Packages
 ```
 pip install -r requirements.txt
@@ -20,8 +25,9 @@ pip install cellpose
 ### Generate Video Examples
 - (Testing) Generate a GIF with a specific structure:
 ```
-python video_gt_gen.py config=test/test_1.yaml
-python video_gt_gen_ray.py config=default.yaml
+python frame_matching.py config=test/test_1.yaml
+python frame_interpolation.py config=test/test_1.yaml
+python video_gt_gen_ray1 config=default.yaml
 ```
 
 - Video ground truth generation
@@ -58,7 +64,7 @@ srun -p cpu -q cpu_qos -c 16 --nodes=1 --time 04:00:00 --pty bash
 
 - Generation code
 ```
-python video_gt_gen_ray.py config=default.yaml
+python ray_script/vector/video_gt_gen_ray_1.py config=default.yaml
 ```
 
 # Bottleneck

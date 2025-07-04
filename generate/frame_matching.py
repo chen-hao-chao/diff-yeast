@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 import random
 import logging
 import pathlib
+import pdb
 
 from collections.abc import MutableMapping
 def flatten_cfg(cfg):
@@ -76,20 +77,24 @@ def main(cfg : DictConfig) -> None:
     
     set_deterministic(0)
     
-    target_dir = '/h/chchao/diff-yeast/generate/test_fig'
+    target_dir = args.target_dir #
     target_path = pathlib.Path(target_dir)
-    target_subdir_path = target_path / ORF / method
-    target_subdir_path.mkdir(parents=True, exist_ok=True)
 
     mean_value = 7.9098546791537325
     loaded_df = pd.read_csv(csv_path)
     root_dir= data_path #select_proteins
     
     df_list = []
+    last_df = None
     for i in range(6):
         print("Loading the {}-th stage...".format(str(i)))
         df = loaded_df[loaded_df['correctedMaxCycle_num'] == i]
         df = df[df['ORF'] == ORF]["filename"].apply(literal_eval)
+        if df.empty:
+            print("The Series is empty!")
+            df = last_df
+        else:
+            last_df = df
         file = df[df.index.values.astype(int)[0]]
         df_list.append(file)
 
@@ -98,6 +103,14 @@ def main(cfg : DictConfig) -> None:
         target_subdir_index_path.mkdir(parents=True, exist_ok=True)
         target_subdir_index_real_frame_path = target_path / ORF / method / str(rand_idx) / "real_frames"
         target_subdir_index_real_frame_path.mkdir(parents=True, exist_ok=True)
+
+        target_subdir_index_selected_frame_path = target_path / ORF / method / str(rand_idx) / "selected_files"
+        if target_subdir_index_selected_frame_path.exists():
+            print("The path exists.")
+            continue
+        else:
+            print("The path does not exist.")
+            
         # rand number
         rnd_0 = randrange(len(df_list[5])) if reverse_playing else randrange(len(df_list[0]))
         rnd_1 = random.uniform(-1, 1)
@@ -105,7 +118,7 @@ def main(cfg : DictConfig) -> None:
         rnd_3 = 0 #random.uniform(-1, 1) # flip
         rnd_4 = randrange(3) if reverse_playing else randrange(7) # -> 3
 
-        img_idx = rnd_0
+        img_idx = rnd_0 % bs
         balance_fac = 0.25 + rnd_1 * 0.2
         angle = rnd_2 * 180
         flip = bool(rnd_3>0)
@@ -249,7 +262,7 @@ def main(cfg : DictConfig) -> None:
         np.save(filepath / 'reference_img_1.npy', np.array(reference_img_1), allow_pickle=True)
         np.save(filepath / 'reference_img_0.npy', np.array(reference_img_0), allow_pickle=True)
         end = time.time()
-        print("Successfully generate: {}".format(os.path.join(target_path, str(rand_idx))))
+        print("Successfully generate: {}".format(str(target_path / ORF / method / str(rand_idx))))
         print("Time (Saving Time): {}".format(end - start))
 
 if __name__ == '__main__':

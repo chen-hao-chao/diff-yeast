@@ -32,7 +32,6 @@ def set_deterministic(seed):
     random.seed(seed)
 
 import time
-import pdb
 @hydra.main(version_base=None, config_path="conf", config_name="base")
 def main(cfg : DictConfig) -> None:
     logger = logging.getLogger(__name__)
@@ -50,11 +49,18 @@ def main(cfg : DictConfig) -> None:
     num = 10
     reverse_playing = False
     set_deterministic(0)
-    target_dir = '/h/chchao/diff-yeast/generate/test_fig'
+    target_dir = args.target_dir #'/h/chchao/diff-yeast/generate/test_fig'
     target_path = pathlib.Path(target_dir)
 
     for rand_idx in range(num):
         filepath = target_path / ORF / method / str(rand_idx) / "selected_files"
+        gifpath = target_path / ORF / method / str(rand_idx) / (str(rand_idx) + '_video.gif')
+        if not filepath.exists():
+            print("The video does not exist! skip it...")
+            continue
+        if gifpath.exists():
+            print("The video exists.")
+            continue
         reference_mask_2 = np.load(filepath / 'reference_mask_2.npy', allow_pickle=True)
         reference_mask_1 = np.load(filepath / 'reference_mask_1.npy', allow_pickle=True)
         reference_mask_0 = np.load(filepath / 'reference_mask_0.npy', allow_pickle=True)

@@ -1,14 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=yeast_2000
+#SBATCH --job-name=yeast_fi6
 #SBATCH -c 40
 #SBATCH --qos=normal
 #SBATCH --partition=rtx6000
-#SBATCH --mem=16G
 #SBATCH --gres=gpu:1
 
 #SBATCH --time=16:00:00
-#SBATCH --output=/h/chchao/diff-yeast/generate/slurm_eval4.out
-#SBATCH --error=/h/chchao/diff-yeast/generate/slurm_eval4.err
+#SBATCH --output=/h/chchao/diff-yeast/generate/slurm_eval_fi6.out
+#SBATCH --error=/h/chchao/diff-yeast/generate/slurm_eval_fi6.err
 #SBATCH --open-mode=append
 #SBATCH --signal=B:USR1@120
 
@@ -20,6 +19,6 @@ source ~/.bashrc
 conda activate cellpose
 which python
 
-python video_gt_gen_ray4.py config=default.yaml
+python video_gt_gen_6_fi.py config=default.yaml
 child="$!"
 wait "$child"

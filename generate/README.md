@@ -2,7 +2,10 @@
 
 ### GPU Request
 ```bash
-srun -p a40 -q normal -c 16 --gres=gpu:1 --time 04:00:00 --pty bash
+srun -p rtx6000 -q normal -c 40 --gres=gpu:1 --time 04:00:00 --pty bash
+srun -p a40 -q normal -c 32 --gres=gpu:1 --time 04:00:00 --pty bash
+srun -p t4v2 -q normal -c 32 --gres=gpu:1 --time 04:00:00 --pty bash
+srun -p a100 -q a100_chchao --gres=gpu:1 --time 04:00:00 --pty bash
 ```
 
 ### Install Packages
@@ -27,7 +30,9 @@ pip install cellpose
 ```
 python frame_matching.py config=test/test_1.yaml
 python frame_interpolation.py config=test/test_1.yaml
-python video_gt_gen_ray1 config=default.yaml
+python video_gt_gen_ray1.py config=default.yaml
+python video_gt_gen_1_fi.py config=default.yaml
+python video_gt_gen_ray_all.py config=default.yaml
 ```
 
 - Video ground truth generation
@@ -70,3 +75,10 @@ python ray_script/vector/video_gt_gen_ray_1.py config=default.yaml
 # Bottleneck
 
 - incomplete `R1` folder (cannot unzip `R1.zip`). need more space.
+
+### Check Number of Files
+
+```bash
+ls -1 | wc -l
+find . -type f -iname "*.gif" | wc -l
+```

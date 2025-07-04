@@ -1,12 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=yeast_750
-#SBATCH --qos=cpu_qos
-#SBATCH --partition=cpu
-#SBATCH --nodes=1
+#SBATCH --job-name=yeast_4750
+#SBATCH -c 40
+#SBATCH --qos=normal
+#SBATCH --partition=rtx6000
+#SBATCH --mem=16G
+#SBATCH --gres=gpu:1
 
-#SBATCH --time=96:00:00
-#SBATCH --output=/h/chchao/diff-yeast/generate/slurm_eval.out
-#SBATCH --error=/h/chchao/diff-yeast/generate/slurm_eval.err
+#SBATCH --time=16:00:00
+#SBATCH --output=/h/chchao/diff-yeast/generate/slurm_eval3.out
+#SBATCH --error=/h/chchao/diff-yeast/generate/slurm_eval3.err
 #SBATCH --open-mode=append
 #SBATCH --signal=B:USR1@120
 

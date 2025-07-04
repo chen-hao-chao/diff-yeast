@@ -10,6 +10,7 @@ hydra:
     dir: .
 
 ORF: Hole
-bs: 500
-exam_bs: 5
+bs: 250
+exam_bs: 1
 method: structure
+target_dir: /h/chchao/diff-yeast/generate/test_fig

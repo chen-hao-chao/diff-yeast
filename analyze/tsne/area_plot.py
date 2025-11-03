@@ -3,9 +3,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-DB_PATH = "YDR458C_green.db"   # adjust if needed
+gene = 'YKR083C'
+DB_PATH = f"db/{gene}_green.db"   # adjust if needed
 CLIP_LEN = 193
 N_CLIPS  = 10
+
+# Stage boundaries (in frame index) and labels
+STAGE_BOUNDARIES = [0, 64, 96, 128, 160, 192]
+STAGE_LABELS     = [1, 2, 3, 4, 5, 6]
 
 # --- helpers ---
 def list_tables(conn):
@@ -18,7 +23,7 @@ def table_columns(conn, table):
 
 def pick_area_column(conn):
     # Prefer this exact per-image mean column if available
-    preferred = "Mean_IdentifyPrimaryGFP_AreaShape_Area"
+    preferred = "AreaShape_Area"
     for t in list_tables(conn):
         cols = table_columns(conn, t)
         if preferred in cols:
@@ -51,13 +56,31 @@ for i in range(N_CLIPS):
     if start >= total:
         ax.set_visible(False)
         continue
-    x = np.arange(start + 1, stop + 1)  # 1-based frame numbering
-    ax.plot(x, y[start:stop])
-    ax.set_title(f"Clip {i+1}: frames {start+1}–{stop}")
+
+    # x indices within a clip
+    x = np.arange(CLIP_LEN)
+    ax.plot(x[:stop-start], y[start:stop])
+    ax.set_xlim(0, CLIP_LEN - 1)
+
+    # --- vertical dashed lines for stages ---
+    for xb in STAGE_BOUNDARIES:
+        ax.axvline(x=xb, linestyle='--', linewidth=0.8, color='gray')
+
+    # --- red bold stage labels along the top (1..6) ---
+    for j, label in enumerate(STAGE_LABELS):
+        x_left = STAGE_BOUNDARIES[j]
+        # right boundary for this stage (last stage just uses the end)
+        if j + 1 < len(STAGE_BOUNDARIES):
+            x_right = STAGE_BOUNDARIES[j + 1]
+        else:
+            x_right = CLIP_LEN - 1
+        x_mid = 0.5 * (x_left + x_right)
+
+    ax.set_title(f"Clip {i+1}")
     if i % 2 == 0:
-        ax.set_ylabel(col)
+        ax.set_ylabel("Area")  # or col if you prefer
     ax.set_xlabel("Frame")
 
-fig.suptitle(f"{col} over 10 clips (length={CLIP_LEN}) — table: {table}", y=0.995)
+fig.suptitle(f"{col} over 10 clips", y=0.995)
 fig.tight_layout()
-plt.savefig('area_plot.png')
+plt.savefig(f'area_plot_{gene}.png')

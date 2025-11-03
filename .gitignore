@@ -9,3 +9,4 @@ vdm/results*
 vdm/logs*
 vdm/stat*
 pvdm/results*
+analyze/extract_frames

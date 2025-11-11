@@ -4,7 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 gene = 'YKR083C'
-DB_PATH = f"db/{gene}_green.db"   # adjust if needed
+color = 'black'
+DB_PATH = f"db/{gene}_{color}.db"   # adjust if needed
 CLIP_LEN = 193
 N_CLIPS  = 10
 
@@ -83,4 +84,4 @@ for i in range(N_CLIPS):
 
 fig.suptitle(f"{col} over 10 clips", y=0.995)
 fig.tight_layout()
-plt.savefig(f'area_plot_{gene}.png')
+plt.savefig(f'area_plot_{gene}_{color}.png')

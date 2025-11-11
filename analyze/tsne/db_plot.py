@@ -3,7 +3,7 @@ import sqlite3, pandas as pd, numpy as np, matplotlib.pyplot as plt
 from pathlib import Path
 from sklearn.decomposition import PCA
 
-DB_PATH = "db/YDR458C_green.db"  # adjust path if needed
+DB_PATH = "db/YNL118C_green.db"  # adjust path if needed
 RANDOM_STATE = 42
 BASE   = np.array([1, 65, 97, 129, 161, 193], dtype=int)
 STRIDE = 193

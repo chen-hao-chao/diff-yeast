@@ -27,12 +27,17 @@ pip install cellpose
 
 ### Generate Video Examples
 - (Testing) Generate a GIF with a specific structure:
-```
+```bash
 python frame_matching.py config=test/test_1.yaml
 python frame_interpolation.py config=test/test_1.yaml
 python video_gt_gen_ray1.py config=default.yaml
 python video_gt_gen_1_fi.py config=default.yaml
 python video_gt_gen_ray_all.py config=default.yaml
+```
+
+```bash
+python frame_matching.py config=test/test_1.yaml
+python frame_interpolation.py config=test/test_1.yaml
 ```
 
 - Video ground truth generation

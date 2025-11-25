@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-gene = 'YKR083C'
+gene = 'YNL118C'
 color = 'black'
 DB_PATH = f"db/{gene}_{color}.db"   # adjust if needed
 CLIP_LEN = 193

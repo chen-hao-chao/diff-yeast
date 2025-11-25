@@ -58,7 +58,7 @@ def main(cfg : DictConfig) -> None:
 
     # file specification
     csv_path = '/datasets/yeast-imgs/single_cell_annotations/group_by_protein_stage_rep1_filename_dict.csv'
-    data_path = '/fs01/datasets/yeast-imgs/cellcycle_single_cell_crops/128/all/R1'
+    data_path = '/datasets/yeast-imgs/cellcycle_single_cell_crops/128/all/R1'
     mode = 'default' #'structure' #'default'
     avg = 0.125
     num = 10

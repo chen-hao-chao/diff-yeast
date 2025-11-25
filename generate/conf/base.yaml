@@ -13,4 +13,4 @@ ORF: Hole
 bs: 250
 exam_bs: 1
 method: structure
-target_dir: /h/chchao/diff-yeast/generate/test_fig
+target_dir: test_fig

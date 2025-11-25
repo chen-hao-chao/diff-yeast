@@ -75,7 +75,7 @@ def main(cfg : DictConfig) -> None:
                     filename=str(rand_idx) + '_video',
                     rotate_angle=0, flip_img=False, apply_mask=True, mode=mode,
                     reverse_playing=reverse_playing,
-                    model_path='/h/chchao/film_net_fp16.pt')
+                    model_path='film_net_fp16.pt')
         end = time.time()
         print("Successfully generate: {}".format(os.path.join(target_path, ORF, method, str(rand_idx))))
         print("Time (Frame Interpolation): {}".format(end - start))

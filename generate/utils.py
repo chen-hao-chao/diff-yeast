@@ -330,12 +330,16 @@ def generate_gif(reference_mask_2, reference_mask_1, reference_mask_0,
         mask2[gif[i][:,:,2] != 0] = 1
         masks.append(aggregate_masks(mask0, mask1, mask2))
 
+    # use this or
     # new_gif = []
     # for i in range(len(gif)):
     #     lined_img = add_outline(gif[i], masks[i], channels=3)
     #     new_gif.append(lined_img)
+    # this (no outline)
+    new_gif = gif
 
-    gif_uint8 = [np.clip((frame * 255 if frame.max() <= 1 else frame), 0, 255).astype(np.uint8) for frame in gif]
+    gif_uint8 = [np.clip((frame * 255 if frame.max() <= 1 else frame), 0, 255).astype(np.uint8) for frame in new_gif]
+
     if reverse_playing:
         frames = [Image.fromarray(frame) for frame in gif_uint8[::-1]]
         frames[0].save(os.path.join(filepath, filename+'.gif'), save_all=True, append_images=frames[1:],

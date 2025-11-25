@@ -2,7 +2,7 @@ results/*
 test_fig*
 gt_videos
 # generate/test_fig*
-# generate/ori_fig*
+generate/*.pt
 __pycache__/*
 vdm/wandb*
 vdm/results*

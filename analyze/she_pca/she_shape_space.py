@@ -41,6 +41,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.path import Path as MplPath
 from PIL import Image, ImageSequence
 from sklearn.decomposition import PCA
 from skimage.filters import threshold_otsu, gaussian
@@ -111,6 +112,13 @@ NUCLEUS_ROI_DILATION_RADIUS = 6
 # filter here, since remove_small_components/opening already do that at
 # the pixel level and clearly aren't enough for this particular artifact.
 MAX_NUCLEI_COMPONENTS = 2
+
+# Minimum consecutive frames a video's raw n_nuclei==2 signal must sustain
+# before the mean_shape_trajectory.gif visualization treats it as actually
+# divided (see _forward_fill_nucleus2) -- filters isolated-frame noise in
+# both directions so the displayed transition is a single clean step
+# (1,1,1,...,2,2,2,...), never oscillating.
+NUCLEUS2_MIN_STABLE_RUN = 3
 
 PCA_K = 8
 
@@ -1015,6 +1023,38 @@ def _print_stage2_summary(n_valid_arr, k_used_arr, evr_arr, n_videos):
         print(f"  {n_skipped} frames skipped PCA entirely (n_valid < 3)")
 
 
+def mean_nucleus_offset(table, frame_idx, suffix="", min_n=3):
+    """Mean position of a nucleus relative to the cell centroid, expressed
+    in the cell's own pose-normalized (rotation-aligned) frame -- i.e.
+    where that nucleus actually sits inside the cell on average, rather
+    than the (0, 0) every independently-pose-normalized shape defaults to.
+    Without this, two nuclei drawn at their own origins land exactly on
+    top of each other and on top of the cell's centroid, which is not
+    where either of them really is.
+
+    suffix="" is the primary (larger/only) nucleus; suffix="_2" is the
+    second one, restricted to n_nuclei==2 frames. Uses the exact same
+    rotation convention as normalize_pose (mirrored here, not re-derived)
+    so this is guaranteed consistent with how the cell contour itself was
+    rotated into its displayed frame.
+
+    Returns (offset, n) with offset=None if fewer than min_n videos
+    qualify at this frame.
+    """
+    mask = table["valid_single"] & (table["frame_idx"] == frame_idx)
+    if suffix == "_2":
+        mask = mask & (table["n_nuclei"] == 2)
+    n = int(mask.sum())
+    if n < min_n:
+        return None, n
+    raw_offset = table[f"nucleus_centroid{suffix}"][mask] - table["cell_centroid"][mask]
+    angle = table["cell_angle"][mask]
+    c, s = np.cos(-angle), np.sin(-angle)
+    x = raw_offset[:, 0] * c - raw_offset[:, 1] * s
+    y = raw_offset[:, 0] * s + raw_offset[:, 1] * c
+    return np.stack([x, y], axis=1).mean(axis=0), n
+
+
 def mean_nucleus2_contour(table, frame_idx, min_n=3):
     """Pooled mean shape of the SECOND (smaller) nucleus at `frame_idx`,
     across whichever videos have n_nuclei==2 there. This is a plain
@@ -1035,6 +1075,109 @@ def mean_nucleus2_contour(table, frame_idx, min_n=3):
     return efd_decode(coeffs, order=NUCLEUS_EFD_ORDER), n
 
 
+def _polygon_raster_mask(contour, grid_x, grid_y):
+    xx, yy = np.meshgrid(grid_x, grid_y)
+    pts = np.stack([xx.ravel(), yy.ravel()], axis=1)
+    inside = MplPath(contour).contains_points(pts)
+    return inside.reshape(xx.shape)
+
+
+def union_contour_if_overlapping(contour_a, contour_b, grid_res=0.3):
+    """If two closed polygons overlap, return the boundary of their union
+    (rasterize both -> OR -> find_contours, reusing the same contour
+    tracer as segmentation rather than adding a polygon-geometry
+    dependency); otherwise return None so the caller draws them separately.
+    """
+    all_xy = np.vstack([contour_a, contour_b])
+    xmin, ymin = all_xy.min(axis=0) - 1
+    xmax, ymax = all_xy.max(axis=0) + 1
+    nx = max(int((xmax - xmin) / grid_res), 4)
+    ny = max(int((ymax - ymin) / grid_res), 4)
+    grid_x = np.linspace(xmin, xmax, nx)
+    grid_y = np.linspace(ymin, ymax, ny)
+
+    mask_a = _polygon_raster_mask(contour_a, grid_x, grid_y)
+    mask_b = _polygon_raster_mask(contour_b, grid_x, grid_y)
+    if not (mask_a & mask_b).any():
+        return None
+
+    contours_rc = find_contours((mask_a | mask_b).astype(float), level=0.5)
+    if not contours_rc:
+        return None
+    longest = max(contours_rc, key=len)
+    xs = xmin + longest[:, 1] * (xmax - xmin) / (nx - 1)
+    ys = ymin + longest[:, 0] * (ymax - ymin) / (ny - 1)
+    return np.stack([xs, ys], axis=1)
+
+
+def _forward_fill_nucleus2(table, min_run=NUCLEUS2_MIN_STABLE_RUN):
+    """Strict step-function view of the second nucleus, for visualization
+    only: per video, the pattern is forced to look like
+    1,1,1,1,1,2,2,2,2,2 -- a single clean transition, never oscillating.
+
+    Per-frame nucleus segmentation is noisy in BOTH directions: a video
+    can glitch to n_nuclei==1 for an isolated frame during real division
+    (false negative), or show a one-off spurious n_nuclei==2 amid a
+    solidly undivided stretch (false positive). Trusting either kind of
+    single-frame blip is wrong, so a video is only considered divided once
+    its raw n_nuclei==2 signal is sustained for >= min_run consecutive
+    frames; a lone stray frame never flips the state either way. Once that
+    sustained run is found, the transition point is locked at the run's
+    start, and -- since division doesn't reverse -- every later frame is
+    treated as divided too, carrying forward the most recent valid
+    nucleus_2 fields to paper over any subsequent glitch frames. A video
+    that never reaches a stable run of length min_run is treated as never
+    divided at all (its isolated blips are pure noise).
+
+    Returns a patched shallow copy of `table` (only n_nuclei,
+    nucleus_efd_2, nucleus_centroid_2 differ) -- the original is
+    untouched, since n_nuclei/valid_single still need to reflect the
+    genuine per-frame measurement for every other use (Stage 1 summaries,
+    Stage 2's main PCA, etc).
+    """
+    n_rows = len(table["frame_idx"])
+    has2 = np.zeros(n_rows, dtype=bool)
+    efd2 = table["nucleus_efd_2"].copy()
+    centroid2 = table["nucleus_centroid_2"].copy()
+    raw_has2 = table["valid_single"] & (table["n_nuclei"] == 2)
+
+    for vid in np.unique(table["video_id"]):
+        idx = np.flatnonzero(table["video_id"] == vid)
+        idx = idx[np.argsort(table["frame_idx"][idx])]
+
+        confirmed = False
+        run_start_pos = None
+        run_len = 0
+        last_efd2, last_centroid2 = None, None
+
+        for pos, i in enumerate(idx):
+            if raw_has2[i]:
+                if run_len == 0:
+                    run_start_pos = pos
+                run_len += 1
+                last_efd2, last_centroid2 = efd2[i], centroid2[i]
+            else:
+                run_len = 0
+
+            if not confirmed and run_len >= min_run:
+                confirmed = True
+                for p in range(run_start_pos, pos + 1):
+                    has2[idx[p]] = True  # these frames have their own raw data already
+
+            if confirmed:
+                has2[i] = True
+                efd2[i] = last_efd2
+                centroid2[i] = last_centroid2
+
+    patched = dict(table)
+    # When not confirmed, force to non-2 even if the raw value itself was
+    # an unconfirmed (isolated) 2 -- that's exactly the blip being filtered.
+    patched["n_nuclei"] = np.where(has2, 2, np.minimum(table["n_nuclei"], 1))
+    patched["nucleus_efd_2"] = efd2
+    patched["nucleus_centroid_2"] = centroid2
+    return patched
+
+
 def _plot_mean_shape_trajectory(results_by_frame, n_frames, out_dir, n_qc_frames, table=None, fps=12):
     """Animate the pooled mean cell+nucleus shape across every frame 0..n_frames-1
     into mean_shape_trajectory.gif (one axis range shared across all frames,
@@ -1042,15 +1185,36 @@ def _plot_mean_shape_trajectory(results_by_frame, n_frames, out_dir, n_qc_frames
     hide the actual size growth across the trajectory). When `table` is
     given, also overlays the pooled mean of the SECOND nucleus (post-
     mitosis, pre-cytokinesis frames) whenever enough videos have one at
-    that frame.
+    that frame -- using a forward-filled, monotonic view of "has a second
+    nucleus" so the display transitions cleanly once, instead of flashing
+    back and forth around the display threshold (see _forward_fill_nucleus2).
     """
     contours_by_frame = {t: mean_shape_contours(results_by_frame[t]) for t in range(n_frames)}
+    table2 = _forward_fill_nucleus2(table) if table is not None else None
+
+    def _offsets(t):
+        if table is None:
+            return np.zeros(2), np.zeros(2)
+        off1, _ = mean_nucleus_offset(table, t, suffix="")
+        off2, _ = mean_nucleus_offset(table2, t, suffix="_2")
+        return (off1 if off1 is not None else np.zeros(2)), off2
+
     nucleus2_by_frame = (
-        {t: mean_nucleus2_contour(table, t) for t in range(n_frames)}
+        {t: mean_nucleus2_contour(table2, t) for t in range(n_frames)}
         if table is not None else {t: (None, 0) for t in range(n_frames)}
     )
-    all_pts = [c for pair in contours_by_frame.values() for c in pair if c is not None]
-    all_pts += [c for c, _ in nucleus2_by_frame.values() if c is not None]
+    offsets_by_frame = {t: _offsets(t) for t in range(n_frames)}
+
+    all_pts = []
+    for t in range(n_frames):
+        cell_c, nucleus_c = contours_by_frame[t]
+        off1, off2 = offsets_by_frame[t]
+        if cell_c is not None:
+            all_pts.append(cell_c)
+            all_pts.append(nucleus_c + off1)
+        nucleus2_c, _ = nucleus2_by_frame[t]
+        if nucleus2_c is not None and off2 is not None:
+            all_pts.append(nucleus2_c + off2)
     if not all_pts:
         print("Mean shape trajectory: no PCA results available at any frame; skipping.")
         return
@@ -1067,15 +1231,29 @@ def _plot_mean_shape_trajectory(results_by_frame, n_frames, out_dir, n_qc_frames
         ax.clear()
         cell_contour, nucleus_contour = contours_by_frame[t]
         nucleus2_contour, n_dividing = nucleus2_by_frame[t]
+        off1, off2 = offsets_by_frame[t]
         if cell_contour is not None:
+            nucleus_shifted = nucleus_contour + off1
             cell_c = np.vstack([cell_contour, cell_contour[0]])
-            nucleus_c = np.vstack([nucleus_contour, nucleus_contour[0]])
             ax.plot(cell_c[:, 0], cell_c[:, 1], "m-", lw=2, label="mean cell")
-            ax.plot(nucleus_c[:, 0], nucleus_c[:, 1], "c-", lw=2, label="mean nucleus")
-            if nucleus2_contour is not None:
-                nucleus2_c = np.vstack([nucleus2_contour, nucleus2_contour[0]])
-                ax.plot(nucleus2_c[:, 0], nucleus2_c[:, 1], "y-", lw=2,
-                        label=f"mean nucleus #2 (n={n_dividing})")
+
+            if nucleus2_contour is not None and off2 is not None:
+                nucleus2_shifted = nucleus2_contour + off2
+                union = union_contour_if_overlapping(nucleus_shifted, nucleus2_shifted)
+                if union is not None:
+                    union_c = np.vstack([union, union[0]])
+                    ax.plot(union_c[:, 0], union_c[:, 1], "c-", lw=2,
+                            label=f"mean nucleus (union, n2={n_dividing})")
+                else:
+                    nucleus_c = np.vstack([nucleus_shifted, nucleus_shifted[0]])
+                    nucleus2_c = np.vstack([nucleus2_shifted, nucleus2_shifted[0]])
+                    ax.plot(nucleus_c[:, 0], nucleus_c[:, 1], "c-", lw=2, label="mean nucleus")
+                    ax.plot(nucleus2_c[:, 0], nucleus2_c[:, 1], "c-", lw=2,
+                            label=f"mean nucleus #2 (n={n_dividing})")
+            else:
+                nucleus_c = np.vstack([nucleus_shifted, nucleus_shifted[0]])
+                ax.plot(nucleus_c[:, 0], nucleus_c[:, 1], "c-", lw=2, label="mean nucleus")
+
             ax.legend(loc="upper right", fontsize=8)
         else:
             ax.text(0.5, 0.5, "no PCA\n(n_valid<3)", ha="center", va="center", transform=ax.transAxes)

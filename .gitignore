@@ -10,3 +10,5 @@ vdm/logs*
 vdm/stat*
 pvdm/results*
 analyze/extract_frames/Y*
+analyze/trajectory/*.gif
+analyze/she_pca/out*

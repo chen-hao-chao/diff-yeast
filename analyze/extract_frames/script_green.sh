@@ -2,7 +2,7 @@
 set -euo pipefail
 
 INPUT_DIR="/home/chchao0/projects/aip-rahulgk/chchao0/generated_video"
-NAMES="YDR458C"
+NAMES="YKL007W"
 METHODS="nucleus"
 OUT_PREFIX="${NAMES}/extracted_green_${NAMES}_"
 
